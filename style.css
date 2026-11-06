@@ -45,7 +45,7 @@ html, body {
   white-space: pre-wrap;
   word-break: break-word;
   transition: opacity .9s ease, filter .9s ease;
-  animation: poweron .7s ease-out 1.4s both;
+  animation: poweron .7s ease-out 1.4s backwards; /* backwards: leaves transform free for the glitch */
 }
 .term.fade { opacity: 0; filter: blur(4px); }
 .ln { min-height: 1.6em; }
@@ -103,7 +103,7 @@ html, body {
   position: fixed;
   inset: 0;
   display: grid;
-  place-content: center;
+  grid-template-rows: 1fr auto 1fr;
   justify-items: center;
   padding: 0 16px;
   text-align: center;
@@ -116,6 +116,9 @@ html, body {
   line-height: 1;
   color: var(--pink);
 }
+.end .top { align-self: end; display: grid; justify-items: center; }
+.end p { text-shadow: 0 0 4px var(--bg), 0 0 10px var(--bg), 0 0 18px var(--bg); } /* readable over the sunflower core */
+.end .bottom { align-self: start; display: grid; justify-items: center; }
 .end .num { margin: 4px 0 0; min-height: 1.6em; letter-spacing: .06em; }
 .end .digits {
   margin: 10px 0 0;
@@ -171,6 +174,17 @@ html, body {
 .journal .cmd { margin-bottom: 30px; }
 .journal .d { color: #666; font-size: 12px; }
 .journal .last { color: #f2ede4; }
+.journal .mine { color: var(--pink); }
+
+.crt.tear::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  top: var(--tear);
+  height: 3px;
+  background: rgba(255, 255, 255, .22);
+  box-shadow: 0 0 12px rgba(255, 255, 255, .25);
+}
 
 /* CRT overlay: scanlines + vignette + flicker */
 .crt {

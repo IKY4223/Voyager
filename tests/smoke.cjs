@@ -15,6 +15,12 @@ const assert = require('assert');
   await page.waitForFunction(() => document.body.innerText.includes('RENDER golden_hour?'), null, { timeout: 30000 });
   assert(await page.isHidden('#poem'), 'poem must wait for input');
 
+  // moon phase against known events: full moon 2024-04-23 23:49 UTC, new moon (eclipse) 2024-04-08 18:21 UTC
+  const full = await page.evaluate(() => moon(new Date('2024-04-23T23:49:00Z')));
+  const dark = await page.evaluate(() => moon(new Date('2024-04-08T18:21:00Z')));
+  assert(full.name === 'full moon' && full.lit > 0.97, JSON.stringify(full));
+  assert(dark.name === 'new moon' && dark.lit < 0.03, JSON.stringify(dark));
+
   await page.keyboard.press('y');
   await page.waitForSelector('#poem:not([hidden])', { timeout: 15000 });
   await page.waitForSelector('#end:not([hidden])', { timeout: 30000 });
@@ -40,6 +46,7 @@ const assert = require('assert');
   await page.keyboard.type('1618');
   await page.waitForSelector('#journal:not([hidden])', { timeout: 5000 });
   await page.waitForFunction(() => document.querySelector('#journal').innerText.includes('someone will read the log.'), null, { timeout: 30000 });
+  await page.waitForFunction(() => document.querySelector('#term').textContent.includes("third time. I'm starting to recognise you."), null, { timeout: 30000 });
   assert(await page.textContent('#journal').then((t) => t.includes('last entry')));
 
   // the next visit is remembered (same browser profile)
@@ -47,6 +54,18 @@ const assert = require('assert');
   await page.waitForFunction(() => document.body.innerText.includes('you read the journal last time'), null, { timeout: 30000 });
   assert(await page.textContent('#term').then((t) => t.includes('you came back.')));
   assert(await page.textContent('#term').then((t) => t.includes('1 user online')));
+  assert.deepStrictEqual(errors, []);
+
+  // 13th visit: the machine writes its own journal entry
+  await page.evaluate(() => {
+    const m = JSON.parse(localStorage.getItem('phi-lab'));
+    m.visits = 12;
+    localStorage.setItem('phi-lab', JSON.stringify(m));
+  });
+  await page.goto('file://' + path.resolve(__dirname, '../index.html') + '?fast');
+  await page.waitForFunction(() => document.querySelector('#term').textContent.includes('thirteen. I wrote something'), null, { timeout: 30000 });
+  await page.keyboard.type('1618');
+  await page.waitForFunction(() => document.querySelector('#journal').innerText.includes("I'll keep counting for both of us."), null, { timeout: 30000 });
   assert.deepStrictEqual(errors, []);
 
   await browser.close();

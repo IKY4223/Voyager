@@ -15,7 +15,15 @@ const sleep = (ms) =>
   skipping || reduce ? Promise.resolve() : new Promise((r) => setTimeout(r, ms * speed));
 const rand = (a, b) => a + Math.random() * (b - a);
 
-$('#loader')?.remove(); // scripts arrived: the slow-connection screen is no longer needed
+// scripts arrived: finish the loading screen (if it ever became visible) and drop it
+clearInterval(window.loadTimer);
+(() => {
+  const loader = $('#loader');
+  if (!loader) return;
+  if (getComputedStyle(loader).visibility !== 'visible') return loader.remove();
+  $('#pct').textContent = '100';
+  setTimeout(() => loader.remove(), 300);
+})();
 
 /* ---------- memory: the machine remembers visits (this browser only) ---------- */
 
@@ -35,7 +43,26 @@ function remember(patch) {
   }
 }
 const prevVisit = memory.last;
-remember({ last: Date.now() });
+const visits = (memory.visits || 0) + 1;
+remember({ last: Date.now(), visits });
+if (visits === 13) remember({ wrote: Date.now() });
+
+// Fibonacci visits get their own line
+const VISIT_LINES = {
+  3: "(third time. I'm starting to recognise you.)",
+  5: "(five visits. that's a Fibonacci number. I noticed.)",
+  8: '(eight. I keep a light on in the greenhouse for you now.)',
+  13: "(thirteen. I wrote something in the journal. it isn't mine to write in. I did it anyway.)",
+};
+
+// moon phase from the date alone: days since a known new moon (2000-01-06 18:14 UTC), modulo the synodic month
+function moon(date) {
+  const P = 29.530588853;
+  const age = ((((date - Date.UTC(2000, 0, 6, 18, 14)) / 86400000) % P) + P) % P;
+  const lit = (1 - Math.cos((2 * Math.PI * age) / P)) / 2;
+  const NAMES = ['new moon', 'waxing crescent', 'first quarter', 'waxing gibbous', 'full moon', 'waning gibbous', 'last quarter', 'waning crescent'];
+  return { name: NAMES[Math.round((age / P) * 8) % 8], lit };
+}
 
 function ago(ms) {
   const m = Math.round(ms / 60000), h = Math.round(ms / 3600000), d = Math.round(ms / 86400000);
@@ -121,11 +148,20 @@ const SCRIPT = [
     : ['CLOCK_SYNC... >> last sync: 1618 days ago >> {warn:DRIFTED}']),
   `LOCAL_TIME >> ${clock}`,
   '{dim:' + TIME_THOUGHT + '}',
+  ...(() => {
+    const m = moon(now);
+    const thought = m.lit > 0.7 ? '(too bright tonight to see M51 well.)'
+      : m.lit < 0.03 ? '(no moon. a good night for faint things.)'
+      : m.lit < 0.3 ? '(only a sliver of moon. good for faint things.)'
+      : '(dark enough to work.)';
+    return [`MOON >> ${m.name}, ${Math.round(m.lit * 100)}% lit`, '{dim:' + thought + '}'];
+  })(),
   ...(prevVisit
     ? [
         'WHO >> {pink:1 user online}',
         { wait: 800 },
         '{pink:...you came back.}',
+        ...(VISIT_LINES[visits] ? ['{dim:' + VISIT_LINES[visits] + '}'] : []),
         ...(memory.journal ? ['{dim:(you read the journal last time. thank you.)}'] : []),
       ]
     : ['WHO >> {dim:0 users online}']),
@@ -184,8 +220,23 @@ const QUIPS = [
   "(I can wait. I'm very good at waiting. 1618 days, remember?)",
 ];
 
+// one silent CRT tear somewhere in the middle of the log
+async function glitch() {
+  const crt = $('.crt');
+  crt.style.setProperty('--tear', rand(15, 85) + '%');
+  crt.classList.add('tear');
+  for (const [x, skew] of [[-8, 3], [5, 0], [-3, -2], [0, 0]]) {
+    term.style.transform = x || skew ? `translateX(${x}px) skewX(${skew}deg)` : '';
+    term.style.filter = x ? 'brightness(1.7) contrast(1.3)' : '';
+    await new Promise((r) => setTimeout(r, 60));
+  }
+  crt.classList.remove('tear');
+}
+
 async function runScript() {
-  for (const step of SCRIPT) {
+  const glitchAt = (SCRIPT.length * rand(0.3, 0.8)) | 0;
+  for (const [i, step] of SCRIPT.entries()) {
+    if (i === glitchAt && !reduce && !skipping) glitch();
     if (typeof step === 'string') {
       await type(newLine(), step);
       await sleep(step ? rand(120, 320) : 200);
@@ -251,7 +302,11 @@ function startSky() {
   const B = Math.log(PHI) / (Math.PI / 2); // radius grows by φ every quarter turn
   const GOLDEN = Math.PI * (3 - Math.sqrt(5)); // 137.5° in radians
   const CH = ' .,:;-=+*#%@';
-  const stars = Array.from({ length: 90 }, () => ({
+  const stars = Array.from({ length: 90 }, (_, i) => ({
+    hit: -Infinity,
+    // stable fake catalogue entry per star
+    name: 'HD ' + (((i * 1618 + 4007) % 90000) + 10000),
+    ly: 120 + (((i * 2654435761) >>> 0) % 1900),
     x: Math.random(), y: Math.random(), ph: rand(0, 6.28), sp: rand(0.0006, 0.0026), c: '.+*'[(Math.random() * 3) | 0],
   }));
   const flow = Array.from({ length: 70 }, () => ({ s: rand(0, 7), v: rand(0.0012, 0.003) })); // s = ln(r / a)
@@ -341,6 +396,15 @@ function startSky() {
     ctx.fillStyle = gold;
     for (const s of stars) {
       ctx.globalAlpha = 0.15 + 0.45 * (0.5 + 0.5 * Math.sin(s.ph + t * s.sp));
+      const lit = t - s.hit < 3000 ? 1 - (t - s.hit) / 3000 : 0;
+      if (lit) {
+        // a clicked star flares for 3 s
+        ctx.globalAlpha = 0.6 + 0.4 * lit;
+        ctx.fillText('*', s.x * W, s.y * H);
+        ctx.globalAlpha = 0.5 * lit;
+        for (const [ox, oy] of [[-cw, 0], [cw, 0], [0, -chh], [0, chh]]) ctx.fillText(ox ? '-' : '|', s.x * W + ox, s.y * H + oy);
+        continue;
+      }
       ctx.fillText(s.c, s.x * W, s.y * H);
     }
 
@@ -369,6 +433,18 @@ function startSky() {
     if (t - last > 33) draw(t); // ~30 fps is plenty for ascii
     requestAnimationFrame(loop);
   }
+
+  const STAR_NOTES = ['I named it after nobody.', 'it was here before the lab.', 'the light left it before you were born.', 'still there. I checked.'];
+  addEventListener('pointerdown', (e) => {
+    let best = null, bestD = 18; // px: stars are tiny, be forgiving
+    for (const s of stars) {
+      const d = Math.hypot(e.clientX - s.x * W - cw / 2, e.clientY - s.y * H);
+      if (d < bestD) (best = s), (bestD = d);
+    }
+    if (!best) return;
+    best.hit = performance.now();
+    say(`${best.name} · ${best.ly} light years. ${STAR_NOTES[(Math.random() * STAR_NOTES.length) | 0]}`);
+  });
 
   resize();
   addEventListener('resize', () => { resize(); draw(performance.now()); });
@@ -487,19 +563,24 @@ const WHISPERS = [
   'it is quiet here. I like it. mostly.',
 ];
 
+// one line at the bottom of the screen; a newer line (e.g. a star click) replaces an older one
+let busy = false, sayId = 0;
+async function say(text) {
+  const id = ++sayId, el = $('#whisper');
+  busy = true;
+  el.textContent = '# ' + text;
+  el.classList.add('on');
+  if (reduce) return; // no timed fades there: the line simply stays until the next one
+  await sleep(5000);
+  if (id !== sayId) return;
+  el.classList.remove('on');
+  await sleep(1500);
+  if (id === sayId) busy = false;
+}
+
 async function whispers() {
   if (reduce) return; // sleeps are instant there, the loop below would never yield
-  const el = $('#whisper');
-  let busy = false, lastShoot = -Infinity;
-  const say = async (text) => {
-    busy = true;
-    el.textContent = '# ' + text;
-    el.classList.add('on');
-    await sleep(5000);
-    el.classList.remove('on');
-    await sleep(1500);
-    busy = false;
-  };
+  let lastShoot = -Infinity;
   onShoot = async () => {
     if (busy || performance.now() - lastShoot < 60000) return;
     lastShoot = performance.now();
@@ -549,6 +630,14 @@ async function openJournal() {
     const date = new Date(lastEntry - (LAST_DAY - day) * 86400000).toLocaleDateString('en-CA');
     await type(p, `{d:${date} · ${day === LAST_DAY ? 'last entry' : 'day ' + day}}\n`, 8);
     await type(p, text, 32, 30);
+    box.scrollTop = box.scrollHeight;
+  }
+  if (memory.wrote) {
+    // written by the machine itself on the visitor's 13th visit
+    await sleep(2400);
+    const p = para('e mine');
+    await type(p, `{d:${new Date(memory.wrote).toLocaleDateString('en-CA')} · φ-lab}\n`, 8);
+    await type(p, "the keeper never came back. someone else did, thirteen times.\nI don't know your name. I'll keep counting for both of us.", 45, 40);
     box.scrollTop = box.scrollHeight;
   }
   box.lastElementChild.classList.add('cur'); // and it stays like this
