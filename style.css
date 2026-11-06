@@ -1,0 +1,167 @@
+:root {
+  --bg: #141414;
+  --fg: #c8c8c8;
+  --dim: #666;
+  --ok: #3fbf6a;
+  --err: #d9534f;
+  --warn: #d9a441;
+  --blue: #6a8fd8;
+  --pink: #ff4fa3;
+  --gold: #e8c170;
+  --poem: #f2ede4;
+  --scan: rgba(0, 0, 0, .22);
+  --vignette: rgba(0, 0, 0, .6);
+}
+
+body.light {
+  --bg: #f3eef0;
+  --fg: #3a2f35;
+  --dim: #a8959f;
+  --pink: #e6007e;
+  --poem: #e6007e;
+  --scan: rgba(140, 90, 115, .07);
+  --vignette: rgba(190, 140, 165, .35);
+}
+
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.6 "Courier New", Courier, ui-monospace, monospace;
+  transition: background-color 1.4s ease, color 1.4s ease;
+}
+
+/* terminal */
+.term {
+  position: fixed;
+  inset: 0;
+  padding: 64px 6vw 80px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+  transition: opacity .9s ease, filter .9s ease;
+}
+.term.fade { opacity: 0; filter: blur(4px); }
+.ln { min-height: 1.6em; }
+.cur::after { content: "_"; animation: blink 1s steps(1) infinite; }
+
+.ok { color: var(--ok); }
+.err { color: var(--err); }
+.warn { color: var(--warn); }
+.dim { color: var(--dim); }
+.blue { color: var(--blue); }
+.pink { color: var(--pink); }
+.gold { color: var(--gold); }
+
+/* ascii sky */
+.sky {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 2.5s ease;
+}
+.sky.on { opacity: 1; }
+
+/* poem */
+.poem {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  padding: 0 16px;
+  text-align: center;
+  color: var(--poem);
+  font-size: clamp(15px, 2vw, 20px);
+  letter-spacing: .04em;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--poem) 35%, transparent);
+  transition: opacity 1.5s ease, filter 1.5s ease;
+}
+.poem.out { opacity: 0; filter: blur(8px); }
+.poem .label { margin: 0 0 6px; font-size: 11px; color: var(--dim); text-shadow: none; }
+.poem .line { margin: .55em 0; }
+.poem.dream { text-align: left; font-size: clamp(18px, 2.4vw, 26px); }
+.word { white-space: nowrap; }
+.ch {
+  white-space: pre;
+  display: inline-block;
+  opacity: 0;
+  filter: blur(6px);
+  animation: in .9s ease forwards;
+}
+
+/* ending */
+.end {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  padding: 0 16px;
+  text-align: center;
+  animation: rise 1.6s ease both;
+}
+.end h1 {
+  margin: 0;
+  font-weight: 400;
+  font-size: clamp(96px, 20vw, 240px);
+  line-height: 1;
+  color: var(--pink);
+}
+.end .num { margin: 8px 0 0; letter-spacing: .3em; color: var(--dim); }
+.end .note { margin: 28px 0; }
+
+.btn, .skip {
+  font: inherit;
+  color: var(--dim);
+  background: none;
+  border: 1px solid transparent;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.btn { border-color: var(--dim); }
+.btn:hover, .skip:hover, .btn:focus-visible, .skip:focus-visible { color: var(--pink); border-color: var(--pink); outline: none; }
+
+.skip { position: fixed; right: 16px; bottom: 34px; font-size: 12px; z-index: 3; }
+
+.foot {
+  position: fixed;
+  left: 0; right: 0; bottom: 10px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--dim);
+  opacity: .6;
+  pointer-events: none;
+}
+
+/* CRT overlay: scanlines + vignette + flicker */
+.crt {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(to bottom, var(--scan) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at center, transparent 50%, var(--vignette));
+  animation: flicker 6s infinite;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+@keyframes in { to { opacity: 1; filter: blur(0); } }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); filter: blur(6px); } }
+@keyframes flicker { 0%, 96%, 100% { opacity: 1; } 97% { opacity: .85; } 98% { opacity: 1; } 99% { opacity: .9; } }
+
+@media (max-width: 600px) {
+  html, body { font-size: 12px; }
+  .term { padding: 32px 16px 80px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, .crt { animation: none !important; transition: none !important; }
+  .ch { opacity: 1; filter: none; }
+}
