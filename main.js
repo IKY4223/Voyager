@@ -28,29 +28,15 @@ function segs(s) {
   return out;
 }
 
-const scroll = () => (term.scrollTop = term.scrollHeight);
-
 function newLine() {
   term.querySelector('.cur')?.classList.remove('cur');
   const d = document.createElement('div');
   d.className = 'ln cur';
   term.append(d);
-  scroll();
+  term.scrollTop = term.scrollHeight;
   return d;
 }
 
-// print a whole line at once, the way real program output appears
-function put(el, s) {
-  for (const seg of segs(s)) {
-    const sp = document.createElement('span');
-    if (seg.cls) sp.className = seg.cls;
-    sp.textContent = seg.text;
-    el.append(sp);
-  }
-  scroll();
-}
-
-// char-by-char typing (used for the ending)
 async function type(el, s, delay = 6, jitter = 0) {
   for (const seg of segs(s)) {
     const sp = document.createElement('span');
@@ -58,194 +44,114 @@ async function type(el, s, delay = 6, jitter = 0) {
     el.append(sp);
     for (const ch of seg.text) {
       sp.textContent += ch;
-      scroll();
+      term.scrollTop = term.scrollHeight;
       await sleep(delay + rand(0, jitter));
     }
   }
 }
 
-// the machine's own voice: slow, hesitating on punctuation as if choosing words
-async function think(text) {
-  const sp = document.createElement('span');
-  sp.className = 'think';
-  newLine().append(sp);
-  await sleep(rand(400, 900));
-  for (const ch of '# ' + text) {
-    sp.textContent += ch;
-    scroll();
-    await sleep(40 + rand(0, 45) + (',;'.includes(ch) ? 220 : '.?!—'.includes(ch) ? 380 : 0));
-  }
-  await sleep(rand(600, 1000));
-}
-
-async function spin(text, ms, end) {
-  const el = newLine();
-  put(el, text + ' ');
-  const sp = document.createElement('span');
-  el.append(sp);
-  // count frames instead of time, so skip() (instant sleeps) still terminates
-  for (let i = 0; i < ms / 90; i++) {
-    sp.textContent = '|/-\\'[i % 4];
-    await sleep(90);
-  }
-  sp.remove();
-  put(el, '>> ' + end);
-  await sleep(rand(200, 500));
-}
-
-// uneven progress: crawls, stalls, then jumps, like real I/O
-async function bar(text, end) {
-  const el = newLine();
-  put(el, text);
+async function bar(el, to, end) {
   const n = 16;
   const sp = document.createElement('span');
   el.append(sp);
-  for (let p = 0; ; ) {
+  for (let p = 0; ; p = Math.min(to, p + Math.round(rand(3, 11)))) {
     const k = Math.round((p / 100) * n);
     sp.textContent = ` [${'#'.repeat(k)}${'.'.repeat(n - k)}] ${String(p).padStart(3)}%`;
-    if (p >= 100) break;
-    await sleep(Math.random() < 0.12 ? rand(500, 1400) : rand(40, 120));
-    p = Math.min(100, p + Math.round(Math.random() < 0.15 ? rand(10, 22) : rand(1, 6)));
+    if (p >= to) break;
+    await sleep(rand(30, 90));
   }
-  await sleep(rand(250, 600));
-  put(el, ' >> ' + end);
-  await sleep(rand(200, 500));
+  if (end) {
+    await sleep(250);
+    await type(el, ' >> ' + end);
+  }
 }
 
-let kclock = 0; // virtual kernel uptime for dmesg-style timestamps
+const ME = '{dim:<[}{pink:sys@φ-lab}{dim:]>} ';
+const KEEPER = '{dim:<[}{gold:keeper@φ-lab}{dim:]>} ';
 
-// 'K ' kernel line, 'S ' system output, '# ' machine thought, '+ ' autostart script trace, '' blank
-const LOG = [
-  { wait: 2200 },
-  'K Linux version 6.1.0-phi (keeper@phi-lab) (gcc 12.2.0) #1618 SMP PREEMPT_DYNAMIC',
-  'K Command line: BOOT_IMAGE=/vmlinuz root=/dev/sda1 ro quiet',
-  'K ACPI: wakeup source: {gold:RTC alarm}',
-  'K rtc_cmos 00:01: alarm was set by uid 1000, {warn:1618 days ago}',
-  'K Memory: 16297532K/16776756K available',
-  'K smpboot: CPU0: Intel(R) Core(TM) i5-4590 CPU @ 3.30GHz',
-  { wait: 900 },
-  'K ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)',
-  'K ata1.00: ATA-8: WDC WD10EZEX-08WN4A0, 01.01A01, max UDMA/133',
-  { wait: 2000 },
-  'K sd 0:0:0:0: [sda] 1953525168 512-byte logical blocks: (1.00 TB/932 GiB)',
-  'K EXT4-fs (sda1): {warn:recovering journal}',
-  { wait: 1500 },
-  'K EXT4-fs (sda1): mounted filesystem with ordered data mode',
-  'K usb 1-1: new full-speed USB device number 2 using xhci_hcd',
-  'K usb 1-1: Product: phi-lab telescope mount',
-  'K e1000e 0000:00:19.0 eth0: {err:NIC Link is Down}',
-  { wait: 1100 },
+// string = log line; {cmd} = typed after a prompt; {bar} = progress bar; {wait} = pause
+const SCRIPT = [
+  { prompt: ME, cmd: 'wake --soft' },
+  '{dim:// note :: if you can read this, the lights are still on.}',
+  '{dim:// ∴ :: left a note for you in the console.}',
   '',
-  'S Welcome to {pink:φ-lab observatory}!',
-  '',
-  'S [{ok:  OK  }] Started Journal Service.',
-  'S [{ok:  OK  }] Mounted /dev/sky.',
-  'S [{ok:  OK  }] Started Telescope Mount Daemon.',
+  'POWER_STATE... >> CHECKING... >> {ok:STABLE}',
+  'CLOCK_SYNC... >> last sync: 1618 days ago >> {warn:DRIFTED}',
+  'WHO >> {dim:0 users online}',
+  '{ok:[✓]} Memory banks intact. Mostly.',
+  '{ok:[✓]} Mounting /dev/sky... {dim:quiet~}',
+  'LOCATING_OBSERVATORY... >> φ-lab.local >> {ok:FOUND}',
+  { text: 'TELESCOPE[arm_0] >> CALIBRATING', bar: 100, end: '{err:JAMMED}' },
+  { text: 'TELESCOPE[arm_0] >> retry 1', bar: 100, end: '{err:JAMMED}' },
+  { text: 'TELESCOPE[arm_0] >> retry 2', bar: 100, end: '{err:JAMMED}' },
   { wait: 700 },
-  { spin: 'A start job is running for Network Time Sync', ms: 3000, end: '{err:timed out}' },
-  'S [{err:FAILED}] Failed to start Network Time Sync.',
-  'S [{err:FAILED}] Failed to reach operator console: no response.',
-  'S [{ok:  OK  }] Reached target Multi-User System.',
-  { wait: 1400 },
-  '',
-  'S φ-lab login: keeper {dim:(automatic login)}',
-  'S Last login: {warn:1618 days ago} on tty1',
-  'S You have no new mail.',
-  { wait: 1600 },
-  '# ...oh. the alarm worked.',
-  '# I set it myself. in case nobody came back.',
-  { wait: 800 },
-  '+ ~/autostart/observe.sh',
-  { spin: 'ping -c 3 keeper-laptop.local', ms: 3000, end: '{err:100% packet loss}' },
-  { spin: 'ping -c 3 operator.phi-lab.local', ms: 2600, end: '{err:100% packet loss}' },
-  '+ who',
-  { wait: 1400 },
-  '',
-  '# nobody. as expected.',
-  '# fine. the sky does not need an audience.',
-  '',
-  '+ telescope --calibrate arm_0',
-  { bar: 'telescope: calibrating arm_0', end: '{err:JAMMED}' },
-  '+ telescope --calibrate arm_0 --retry',
-  { bar: 'telescope: calibrating arm_0', end: '{err:JAMMED}' },
+  '{dim:...hm.}',
   { wait: 900 },
-  '# ...hm.',
-  'S telescope: lens_cap = {warn:ON}',
-  { wait: 1000 },
-  '+ telescope --lens-cap off',
-  'S telescope: lens_cap = OFF >> {ok:CLEAR}',
-  "# let's pretend that didn't happen.",
+  'TELESCOPE[arm_0] >> lens_cap: {warn:ON}',
+  { wait: 600 },
+  'TELESCOPE[arm_0] >> lens_cap: OFF >> {ok:CLEAR}',
+  "{dim:(...let's pretend that didn't happen.)}",
   '',
-  '+ observe --cam greenhouse/2 --target sunflower',
-  { bar: 'observe: capturing', end: '{ok:done}' },
-  'S observe[1618]: seeds detected: 1387',
-  'S observe[1618]: angle between seeds: {gold:137.507°}',
-  '# still 137.5. it never forgets.',
-  '+ observe --archive nautilus_shell.scan',
-  { bar: 'observe: loading scan', end: '{ok:done}' },
-  'S observe[1618]: chamber growth ratio: 1.33',
-  'S observe[1618]: {warn:expected 1.618 (φ), got 1.33}',
-  '# people always said it was φ. it never was.',
-  '+ observe --sky M51',
-  { spin: 'mount: slewing to RA 13h29m52s Dec +47°11′43″', ms: 3600, end: '{ok:locked}' },
-  { bar: 'observe: exposure 120 s', end: '{ok:done}' },
-  'S observe[1618]: arm shape: logarithmic spiral',
-  '# close to φ. close enough.',
+  { prompt: ME + '$ ', cmd: 'su - keeper' },
+  'Password: ',
+  { prompt: '', cmd: '********' },
+  KEEPER + 'auth() >> {ok:OK} (role: KEEPER, shift: night)',
+  '{dim:last keeper login: 1618 days ago. it was me.}',
   '',
-  '+ phi --iterate',
-  'S phi: F(n+1)/F(n) = 1, 2, 1.5, 1.667, 1.6, 1.625, 1.615, 1.619, 1.6176 …',
-  { bar: 'phi: converging', end: '{gold:1.618033988749894…}' },
-  'S phi: 1 + 1/(1 + 1/(1 + …)) >> {gold:only ones, all the way down}',
-  'S {warn:phi: warning: infinity is not a number. stopping.}',
-  '# smells like rain. ^_^',
+  { text: 'GREENHOUSE.cam[2] >> sunflower', bar: 100, end: '{ok:CAPTURED}' },
+  'SEED_ANGLE(sunflower) >> {gold:137.507°} between every seed',
+  { text: 'ARCHIVE >> nautilus_shell.scan', bar: 100, end: '{ok:LOADED}' },
+  'CHAMBER_RATIO(nautilus) >> 1.33 >> {warn:not φ. people always said it was.}',
+  { text: 'SCANNING_SKY >> M51, the Whirlpool', bar: 100, end: '{ok:DONE}' },
+  'ARM_SHAPE(M51) >> logarithmic spiral >> {gold:close to φ. close enough.}',
+  'COUNT(observers) >> {dim:0}',
   '',
-  '+ mail -s "observation #1618" keeper',
-  'S mail: {err:mailbox full: 1617 unread}',
+  { prompt: KEEPER + '$ ', cmd: 'compute --ratio 1.6180339887' },
+  'φ = 1 + 1/(1 + 1/(1 + 1/(1 + …))) >> {gold:only ones, all the way down}',
+  'SEQ[1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144 ...] >> {gold:converging}',
+  { text: 'ITERATE[1 -> 233]', bar: 100, end: '{ok:DONE}' },
+  { text: 'ITERATE[233 -> 46368]', bar: 100, end: '{ok:DONE}' },
+  'ITERATE[46368 -> ∞] >> LOOPING {gold:1.618033988749894...}',
+  { wait: 900 },
+  '{warn:[WARN]} Infinity is not a number. Breaking out gently...',
+  '{ok:[✓]} Spiral resolved. Smells like rain. ^_^',
+  '',
+  '{pink:[REMINDER]} φ² = φ + 1. 2.618… = 1.618… + 1. still true. checked again.',
+  '{warn:[WARN]} nobody is reading this log.',
   { wait: 1200 },
-  '# nobody reads these. I write them anyway.',
-  'S {warn:[WARN]} nobody is reading this log.',
-  { wait: 2200 },
-  '# ...probably.',
+  '{dim:...probably.}',
   '',
-  'S render: manifest golden_hour >> {ok:ready}',
-  '# if someone is there —',
+  '{dim:<p::render>} MANIFEST >> codename: golden_hour >> {ok:READY}',
+  'Your turn~',
 ];
 
 const QUIPS = [
-  'it is just Y. or any key.',
-  'a tap works too.',
-  "still there? it's been a while since anyone was.",
-  'Y. between T and U.',
-  "I can wait. I'm very good at waiting.",
+  "(It's just Y. Or any key.)",
+  '(A tap works too.)',
+  "(Still there? It's been a while since anyone was.)",
+  '(Y. Between T and U.)',
+  "(I can wait. I'm very good at waiting. 1618 days, remember?)",
 ];
 
-async function runLog() {
-  for (const step of LOG) {
-    if (step.wait) {
-      if (kclock) kclock += step.wait / 1000; // the clock starts with the first kernel line
+async function runScript() {
+  for (const step of SCRIPT) {
+    if (typeof step === 'string') {
+      await type(newLine(), step);
+      await sleep(step ? rand(120, 320) : 200);
+    } else if (step.wait) {
       await sleep(step.wait);
-    } else if (step.spin) {
-      await spin(step.spin, step.ms, step.end);
+    } else if (step.cmd) {
+      // "Password: " already sits on the last line, so continue it
+      const el = step.prompt === '' ? term.lastElementChild : newLine();
+      await type(el, step.prompt);
+      await sleep(500);
+      await type(el, step.cmd, 60, 70);
+      await sleep(400);
     } else if (step.bar) {
-      await bar(step.bar, step.end);
-    } else if (step === '') {
-      newLine();
-      await sleep(150);
-    } else {
-      const kind = step[0], body = step.slice(2);
-      if (kind === '#') await think(body);
-      else if (kind === '+') {
-        await sleep(rand(300, 700));
-        put(newLine(), '{dim:+} ' + body);
-        await sleep(rand(300, 600));
-      } else if (kind === 'K') {
-        put(newLine(), '{dim:[' + kclock.toFixed(6).padStart(12) + ']} ' + body);
-        kclock += rand(0.0004, 0.09);
-        await sleep(rand(25, 110));
-      } else {
-        put(newLine(), body);
-        await sleep(rand(60, 180));
-      }
+      const el = newLine();
+      await type(el, step.text);
+      await bar(el, step.bar, step.end);
+      await sleep(300);
     }
   }
 }
@@ -266,18 +172,18 @@ function waitAnyInput(onInput) {
 
 async function ask() {
   const input = waitAnyInput(startMusic);
-  const question = newLine();
-  put(question, 'RENDER golden_hour? {pink:(Y/y)} ');
+  const el = newLine();
+  await type(el, 'RENDER golden_hour? {pink:(Y/y)} ');
   let stop = false;
   (async () => {
     for (const q of QUIPS) {
-      await sleep(7000);
+      await sleep(6000);
       if (stop) return;
-      await think(q);
+      const cur = term.querySelector('.cur');
+      await type(newLine(), '{dim:' + q + '}', 25);
       if (stop) return;
-      // keep the cursor blinking after the question, not after the thought
-      term.querySelector('.cur')?.classList.remove('cur');
-      question.classList.add('cur');
+      cur?.classList.add('cur'); // keep the cursor blinking after the question
+      term.lastElementChild.classList.remove('cur');
     }
   })();
   await input;
@@ -539,8 +445,8 @@ document.addEventListener('visibilitychange', () => {
 });
 
 (async () => {
-  newLine(); // empty screen with a blinking cursor while the machine powers on
-  await runLog();
+  await sleep(600);
+  await runScript();
   intro = false;
   skipping = false;
   await ask();
