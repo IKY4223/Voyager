@@ -20,6 +20,10 @@ const assert = require('assert');
   await page.waitForSelector('#end:not([hidden])', { timeout: 30000 });
   assert(await page.evaluate(() => document.body.classList.contains('light')), 'ending must be in light theme');
   await page.waitForFunction(() => document.querySelector('#end').innerText.includes('1.618033988749895'), null, { timeout: 10000 });
+  // endless digits are exact (BigInt), not float noise
+  await page.waitForFunction(() => document.querySelector('.digits').textContent.length > 24, null, { timeout: 10000 });
+  const digits = await page.textContent('.digits');
+  assert('1.6180339887498948482045868343656381177203'.startsWith(digits) || digits.startsWith('1.6180339887498948482045868343656381177203'), digits);
   assert.deepStrictEqual(errors, []);
 
   // skip() typed in the browser console jumps the log straight to the prompt

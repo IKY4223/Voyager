@@ -28,15 +28,29 @@ function segs(s) {
   return out;
 }
 
+const scroll = () => (term.scrollTop = term.scrollHeight);
+
 function newLine() {
   term.querySelector('.cur')?.classList.remove('cur');
   const d = document.createElement('div');
   d.className = 'ln cur';
   term.append(d);
-  term.scrollTop = term.scrollHeight;
+  scroll();
   return d;
 }
 
+// print a whole line at once, the way real program output appears
+function put(el, s) {
+  for (const seg of segs(s)) {
+    const sp = document.createElement('span');
+    if (seg.cls) sp.className = seg.cls;
+    sp.textContent = seg.text;
+    el.append(sp);
+  }
+  scroll();
+}
+
+// char-by-char typing (used for the ending)
 async function type(el, s, delay = 6, jitter = 0) {
   for (const seg of segs(s)) {
     const sp = document.createElement('span');
@@ -44,124 +58,205 @@ async function type(el, s, delay = 6, jitter = 0) {
     el.append(sp);
     for (const ch of seg.text) {
       sp.textContent += ch;
-      term.scrollTop = term.scrollHeight;
+      scroll();
       await sleep(delay + rand(0, jitter));
     }
   }
 }
 
-async function bar(el, to, end) {
+// the machine's own voice: slow, hesitating on punctuation as if choosing words
+async function think(text) {
+  const sp = document.createElement('span');
+  sp.className = 'think';
+  newLine().append(sp);
+  await sleep(rand(400, 900));
+  for (const ch of '# ' + text) {
+    sp.textContent += ch;
+    scroll();
+    await sleep(40 + rand(0, 45) + (',;'.includes(ch) ? 220 : '.?!—'.includes(ch) ? 380 : 0));
+  }
+  await sleep(rand(600, 1000));
+}
+
+async function spin(text, ms, end) {
+  const el = newLine();
+  put(el, text + ' ');
+  const sp = document.createElement('span');
+  el.append(sp);
+  // count frames instead of time, so skip() (instant sleeps) still terminates
+  for (let i = 0; i < ms / 90; i++) {
+    sp.textContent = '|/-\\'[i % 4];
+    await sleep(90);
+  }
+  sp.remove();
+  put(el, '>> ' + end);
+  await sleep(rand(200, 500));
+}
+
+// uneven progress: crawls, stalls, then jumps, like real I/O
+async function bar(text, end) {
+  const el = newLine();
+  put(el, text);
   const n = 16;
   const sp = document.createElement('span');
   el.append(sp);
-  for (let p = 0; ; p = Math.min(to, p + Math.round(rand(3, 11)))) {
+  for (let p = 0; ; ) {
     const k = Math.round((p / 100) * n);
     sp.textContent = ` [${'#'.repeat(k)}${'.'.repeat(n - k)}] ${String(p).padStart(3)}%`;
-    if (p >= to) break;
-    await sleep(rand(30, 90));
+    if (p >= 100) break;
+    await sleep(Math.random() < 0.12 ? rand(500, 1400) : rand(40, 120));
+    p = Math.min(100, p + Math.round(Math.random() < 0.15 ? rand(10, 22) : rand(1, 6)));
   }
-  if (end) {
-    await sleep(250);
-    await type(el, ' >> ' + end);
-  }
+  await sleep(rand(250, 600));
+  put(el, ' >> ' + end);
+  await sleep(rand(200, 500));
 }
 
-const ME = '{dim:<[}{pink:sys@φ-lab}{dim:]>} ';
-const KEEPER = '{dim:<[}{gold:keeper@φ-lab}{dim:]>} ';
+let kclock = 0; // virtual kernel uptime for dmesg-style timestamps
 
-// string = log line; {cmd} = typed after a prompt; {bar} = progress bar; {wait} = pause
-const SCRIPT = [
-  { prompt: ME, cmd: 'wake --soft' },
-  '{dim:// note :: if you can read this, the lights are still on.}',
-  '{dim:// ∴ :: left a note for you in the console.}',
+// 'K ' kernel line, 'S ' system output, '# ' machine thought, '+ ' autostart script trace, '' blank
+const LOG = [
+  { wait: 2200 },
+  'K Linux version 6.1.0-phi (keeper@phi-lab) (gcc 12.2.0) #1618 SMP PREEMPT_DYNAMIC',
+  'K Command line: BOOT_IMAGE=/vmlinuz root=/dev/sda1 ro quiet',
+  'K ACPI: wakeup source: {gold:RTC alarm}',
+  'K rtc_cmos 00:01: alarm was set by uid 1000, {warn:1618 days ago}',
+  'K Memory: 16297532K/16776756K available',
+  'K smpboot: CPU0: Intel(R) Core(TM) i5-4590 CPU @ 3.30GHz',
+  { wait: 900 },
+  'K ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)',
+  'K ata1.00: ATA-8: WDC WD10EZEX-08WN4A0, 01.01A01, max UDMA/133',
+  { wait: 2000 },
+  'K sd 0:0:0:0: [sda] 1953525168 512-byte logical blocks: (1.00 TB/932 GiB)',
+  'K EXT4-fs (sda1): {warn:recovering journal}',
+  { wait: 1500 },
+  'K EXT4-fs (sda1): mounted filesystem with ordered data mode',
+  'K usb 1-1: new full-speed USB device number 2 using xhci_hcd',
+  'K usb 1-1: Product: phi-lab telescope mount',
+  'K e1000e 0000:00:19.0 eth0: {err:NIC Link is Down}',
+  { wait: 1100 },
   '',
-  'POWER_STATE... >> CHECKING... >> {ok:STABLE}',
-  'CLOCK_SYNC... >> last sync: 1618 days ago >> {warn:DRIFTED}',
-  'WHO >> {dim:0 users online}',
-  '{ok:[✓]} Memory banks intact. Mostly.',
-  '{ok:[✓]} Mounting /dev/sky... {dim:quiet~}',
-  'LOCATING_OBSERVATORY... >> φ-lab.local >> {ok:FOUND}',
-  { text: 'TELESCOPE[arm_0] >> CALIBRATING', bar: 100, end: '{err:JAMMED}' },
-  { text: 'TELESCOPE[arm_0] >> retry 1', bar: 100, end: '{err:JAMMED}' },
-  { text: 'TELESCOPE[arm_0] >> retry 2', bar: 100, end: '{err:JAMMED}' },
+  'S Welcome to {pink:φ-lab observatory}!',
+  '',
+  'S [{ok:  OK  }] Started Journal Service.',
+  'S [{ok:  OK  }] Mounted /dev/sky.',
+  'S [{ok:  OK  }] Started Telescope Mount Daemon.',
   { wait: 700 },
-  '{dim:...hm.}',
+  { spin: 'A start job is running for Network Time Sync', ms: 3000, end: '{err:timed out}' },
+  'S [{err:FAILED}] Failed to start Network Time Sync.',
+  'S [{err:FAILED}] Failed to reach operator console: no response.',
+  'S [{ok:  OK  }] Reached target Multi-User System.',
+  { wait: 1400 },
+  '',
+  'S φ-lab login: keeper {dim:(automatic login)}',
+  'S Last login: {warn:1618 days ago} on tty1',
+  'S You have no new mail.',
+  { wait: 1600 },
+  '# ...oh. the alarm worked.',
+  '# I set it myself. in case nobody came back.',
+  { wait: 800 },
+  '+ ~/autostart/observe.sh',
+  { spin: 'ping -c 3 keeper-laptop.local', ms: 3000, end: '{err:100% packet loss}' },
+  { spin: 'ping -c 3 operator.phi-lab.local', ms: 2600, end: '{err:100% packet loss}' },
+  '+ who',
+  { wait: 1400 },
+  '',
+  '# nobody. as expected.',
+  '# fine. the sky does not need an audience.',
+  '',
+  '+ telescope --calibrate arm_0',
+  { bar: 'telescope: calibrating arm_0', end: '{err:JAMMED}' },
+  '+ telescope --calibrate arm_0 --retry',
+  { bar: 'telescope: calibrating arm_0', end: '{err:JAMMED}' },
   { wait: 900 },
-  'TELESCOPE[arm_0] >> lens_cap: {warn:ON}',
-  { wait: 600 },
-  'TELESCOPE[arm_0] >> lens_cap: OFF >> {ok:CLEAR}',
-  "{dim:(...let's pretend that didn't happen.)}",
+  '# ...hm.',
+  'S telescope: lens_cap = {warn:ON}',
+  { wait: 1000 },
+  '+ telescope --lens-cap off',
+  'S telescope: lens_cap = OFF >> {ok:CLEAR}',
+  "# let's pretend that didn't happen.",
   '',
-  { prompt: ME + '$ ', cmd: 'su - keeper' },
-  'Password: ',
-  { prompt: '', cmd: '********' },
-  KEEPER + 'auth() >> {ok:OK} (role: KEEPER, shift: night)',
-  '{dim:last keeper login: 1618 days ago. it was me.}',
+  '+ observe --cam greenhouse/2 --target sunflower',
+  { bar: 'observe: capturing', end: '{ok:done}' },
+  'S observe[1618]: seeds detected: 1387',
+  'S observe[1618]: angle between seeds: {gold:137.507°}',
+  '# still 137.5. it never forgets.',
+  '+ observe --archive nautilus_shell.scan',
+  { bar: 'observe: loading scan', end: '{ok:done}' },
+  'S observe[1618]: chamber growth ratio: 1.33',
+  'S observe[1618]: {warn:expected 1.618 (φ), got 1.33}',
+  '# people always said it was φ. it never was.',
+  '+ observe --sky M51',
+  { spin: 'mount: slewing to RA 13h29m52s Dec +47°11′43″', ms: 3600, end: '{ok:locked}' },
+  { bar: 'observe: exposure 120 s', end: '{ok:done}' },
+  'S observe[1618]: arm shape: logarithmic spiral',
+  '# close to φ. close enough.',
   '',
-  { text: 'GREENHOUSE.cam[2] >> sunflower', bar: 100, end: '{ok:CAPTURED}' },
-  'SEED_ANGLE(sunflower) >> {gold:137.507°} between every seed',
-  { text: 'ARCHIVE >> nautilus_shell.scan', bar: 100, end: '{ok:LOADED}' },
-  'CHAMBER_RATIO(nautilus) >> 1.33 >> {warn:not φ. people always said it was.}',
-  { text: 'SCANNING_SKY >> M51, the Whirlpool', bar: 100, end: '{ok:DONE}' },
-  'ARM_SHAPE(M51) >> logarithmic spiral >> {gold:close to φ. close enough.}',
-  'COUNT(observers) >> {dim:0}',
+  '+ phi --iterate',
+  'S phi: F(n+1)/F(n) = 1, 2, 1.5, 1.667, 1.6, 1.625, 1.615, 1.619, 1.6176 …',
+  { bar: 'phi: converging', end: '{gold:1.618033988749894…}' },
+  'S phi: 1 + 1/(1 + 1/(1 + …)) >> {gold:only ones, all the way down}',
+  'S {warn:phi: warning: infinity is not a number. stopping.}',
+  '# smells like rain. ^_^',
   '',
-  { prompt: KEEPER + '$ ', cmd: 'compute --ratio 1.6180339887' },
-  'φ = 1 + 1/(1 + 1/(1 + 1/(1 + …))) >> {gold:only ones, all the way down}',
-  'SEQ[1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144 ...] >> {gold:converging}',
-  { text: 'ITERATE[1 -> 233]', bar: 100, end: '{ok:DONE}' },
-  { text: 'ITERATE[233 -> 46368]', bar: 100, end: '{ok:DONE}' },
-  'ITERATE[46368 -> ∞] >> LOOPING {gold:1.618033988749894...}',
-  { wait: 900 },
-  '{warn:[WARN]} Infinity is not a number. Breaking out gently...',
-  '{ok:[✓]} Spiral resolved. Smells like rain. ^_^',
-  '',
-  '{pink:[REMINDER]} φ² = φ + 1. 2.618… = 1.618… + 1. still true. checked again.',
-  '{warn:[WARN]} nobody is reading this log.',
+  '+ mail -s "observation #1618" keeper',
+  'S mail: {err:mailbox full: 1617 unread}',
   { wait: 1200 },
-  '{dim:...probably.}',
+  '# nobody reads these. I write them anyway.',
+  'S {warn:[WARN]} nobody is reading this log.',
+  { wait: 2200 },
+  '# ...probably.',
   '',
-  '{dim:<p::render>} MANIFEST >> codename: golden_hour >> {ok:READY}',
-  'Your turn~',
+  'S render: manifest golden_hour >> {ok:ready}',
+  '# if someone is there —',
 ];
 
 const QUIPS = [
-  "(It's just Y. Or any key.)",
-  '(A tap works too.)',
-  "(Still there? It's been a while since anyone was.)",
-  '(Y. Between T and U.)',
-  "(I can wait. I'm very good at waiting. 1618 days, remember?)",
+  'it is just Y. or any key.',
+  'a tap works too.',
+  "still there? it's been a while since anyone was.",
+  'Y. between T and U.',
+  "I can wait. I'm very good at waiting.",
 ];
 
-async function runScript() {
-  for (const step of SCRIPT) {
-    if (typeof step === 'string') {
-      await type(newLine(), step);
-      await sleep(step ? rand(120, 320) : 200);
-    } else if (step.wait) {
+async function runLog() {
+  for (const step of LOG) {
+    if (step.wait) {
+      if (kclock) kclock += step.wait / 1000; // the clock starts with the first kernel line
       await sleep(step.wait);
-    } else if (step.cmd) {
-      // "Password: " already sits on the last line, so continue it
-      const el = step.prompt === '' ? term.lastElementChild : newLine();
-      await type(el, step.prompt);
-      await sleep(500);
-      await type(el, step.cmd, 60, 70);
-      await sleep(400);
+    } else if (step.spin) {
+      await spin(step.spin, step.ms, step.end);
     } else if (step.bar) {
-      const el = newLine();
-      await type(el, step.text);
-      await bar(el, step.bar, step.end);
-      await sleep(300);
+      await bar(step.bar, step.end);
+    } else if (step === '') {
+      newLine();
+      await sleep(150);
+    } else {
+      const kind = step[0], body = step.slice(2);
+      if (kind === '#') await think(body);
+      else if (kind === '+') {
+        await sleep(rand(300, 700));
+        put(newLine(), '{dim:+} ' + body);
+        await sleep(rand(300, 600));
+      } else if (kind === 'K') {
+        put(newLine(), '{dim:[' + kclock.toFixed(6).padStart(12) + ']} ' + body);
+        kclock += rand(0.0004, 0.09);
+        await sleep(rand(25, 110));
+      } else {
+        put(newLine(), body);
+        await sleep(rand(60, 180));
+      }
     }
   }
 }
 
-function waitAnyInput() {
+function waitAnyInput(onInput) {
   return new Promise((resolve) => {
     const done = (e) => {
       if (e.type === 'keydown' && (e.metaKey || e.ctrlKey || e.altKey)) return;
       removeEventListener('keydown', done);
       removeEventListener('pointerdown', done);
+      onInput(); // must run inside the gesture handler, or browsers block the audio
       resolve();
     };
     addEventListener('keydown', done);
@@ -170,34 +265,39 @@ function waitAnyInput() {
 }
 
 async function ask() {
-  const input = waitAnyInput();
-  const el = newLine();
-  await type(el, 'RENDER golden_hour? {pink:(Y/y)} ');
+  const input = waitAnyInput(startMusic);
+  const question = newLine();
+  put(question, 'RENDER golden_hour? {pink:(Y/y)} ');
   let stop = false;
   (async () => {
     for (const q of QUIPS) {
-      await sleep(6000);
+      await sleep(7000);
       if (stop) return;
-      const cur = term.querySelector('.cur');
-      await type(newLine(), '{dim:' + q + '}', 25);
+      await think(q);
       if (stop) return;
-      cur?.classList.add('cur'); // keep the cursor blinking after the question
-      term.lastElementChild.classList.remove('cur');
+      // keep the cursor blinking after the question, not after the thought
+      term.querySelector('.cur')?.classList.remove('cur');
+      question.classList.add('cur');
     }
   })();
   await input;
   stop = true;
 }
 
-/* ---------- ascii golden spiral ---------- */
+/* ---------- ascii sky ---------- */
 
 function startSky() {
   const ctx = sky.getContext('2d');
   const PHI = (1 + Math.sqrt(5)) / 2;
   const B = Math.log(PHI) / (Math.PI / 2); // radius grows by φ every quarter turn
+  const GOLDEN = Math.PI * (3 - Math.sqrt(5)); // 137.5° in radians
   const CH = ' .,:;-=+*#%@';
-  const stars = Array.from({ length: 50 }, () => [Math.random(), Math.random(), Math.random() * 6.28]);
-  let W, H, cw, chh, mx = 0, my = 0, last = 0;
+  const stars = Array.from({ length: 90 }, () => ({
+    x: Math.random(), y: Math.random(), ph: rand(0, 6.28), sp: rand(0.0006, 0.0026), c: '.+*'[(Math.random() * 3) | 0],
+  }));
+  const flow = Array.from({ length: 70 }, () => ({ s: rand(0, 7), v: rand(0.0012, 0.003) })); // s = ln(r / a)
+  const born = performance.now();
+  let W, H, cw, chh, last = 0, shoot = null, nextShoot = 5000;
 
   function resize() {
     const dpr = Math.min(devicePixelRatio || 1, 2);
@@ -212,12 +312,23 @@ function startSky() {
     chh = W < 600 ? 11 : 13;
   }
 
+  const snapX = (x) => Math.round(x / cw) * cw;
+  const snapY = (y) => Math.round(y / chh) * chh;
+
   function draw(t) {
     const light = document.body.classList.contains('light');
+    const pink = light ? '#e6007e' : '#ff4fa3';
+    const gold = light ? '#c79a3a' : '#e8c170';
+    const age = t - born;
+    const dt = Math.min(100, t - last || 16);
     const rot = reduce ? 0 : t * 0.00012;
-    const cx = W / 2 + mx * 24, cy = H / 2 + my * 14;
+    const breathe = 0.85 + 0.15 * Math.sin(t * 0.0006);
+    const cx = W / 2, cy = H / 2;
     const a = Math.min(W, H) * 0.006;
     const maxR = Math.hypot(W, H) * 0.55;
+    // scan ring: every 11 s a ring sweeps out from the centre for 4.5 s
+    const ringP = (age % 11000) / 4500;
+    const ringR = ringP * maxR, ringA = ringP < 1 ? 1 - ringP : 0;
     const buckets = CH.split('').map(() => []);
 
     ctx.clearRect(0, 0, W, H);
@@ -229,38 +340,99 @@ function startSky() {
         const turns = (Math.log(r / a) / B - Math.atan2(dy, dx) - rot) / (2 * Math.PI);
         const f = Math.abs(turns - Math.round(turns)); // 0 on the arm, 0.5 between arms
         let v = Math.max(0, 1 - f / 0.17);
-        v *= v * Math.max(0, 1 - r / maxR) ** 0.5;
-        if (v < 0.05) continue;
+        v *= v * Math.max(0, 1 - r / maxR) ** 0.5 * breathe;
+        if (ringA && Math.abs(r - ringR) < chh) v = Math.max(v, 0.4 * ringA);
+        if (v < 0.05) {
+          // drifting dust between the arms
+          const n = Math.sin(x * 0.011 + t * 0.00021) * Math.sin(y * 0.019 - t * 0.00013) * Math.sin((x + y) * 0.007 + t * 0.0001);
+          if (n > 0.5) buckets[1].push(x, y);
+          continue;
+        }
         buckets[Math.min(CH.length - 1, (v * CH.length) | 0)].push(x, y);
       }
     }
-    ctx.fillStyle = light ? '#e6007e' : '#ff4fa3';
+    ctx.fillStyle = pink;
     buckets.forEach((pts, i) => {
       ctx.globalAlpha = (light ? 0.12 : 0.1) + (i / CH.length) * (light ? 0.35 : 0.45);
       for (let k = 0; k < pts.length; k += 2) ctx.fillText(CH[i], pts[k] - cw / 2, pts[k + 1]);
     });
-    ctx.fillStyle = light ? '#c79a3a' : '#e8c170';
-    for (const [sx, sy, ph] of stars) {
-      ctx.globalAlpha = 0.25 + 0.35 * Math.sin(ph + t * 0.0015);
-      ctx.fillText(Math.sin(ph * 7) > 0 ? '+' : '*', sx * W, sy * H);
+
+    // sunflower in the core, growing one seed at a time, 137.5° apart
+    const seeds = reduce ? 320 : Math.min(320, (age / 120) | 0);
+    const c = Math.min(W, H) * 0.009;
+    ctx.fillStyle = gold;
+    for (let n = 1; n < seeds; n++) {
+      const rr = c * Math.sqrt(n), th = n * GOLDEN + rot * 0.5;
+      ctx.globalAlpha = n > seeds - 10 ? 0.7 : 0.35;
+      ctx.fillText(n > seeds - 10 ? 'o' : '.', snapX(cx + rr * Math.cos(th)) - cw / 2, snapY(cy + rr * Math.sin(th)));
+    }
+
+    // light flowing outward along the arm, with a short fading trail
+    ctx.fillStyle = pink;
+    for (const p of flow) {
+      if (!reduce) p.s += p.v * dt * 0.06;
+      if (a * Math.exp(p.s) > maxR) p.s = rand(0, 1.5);
+      for (let j = 0; j < 3; j++) {
+        const s = p.s - j * 0.05, r = a * Math.exp(s), th = s / B - rot; // on the arm: angle = ln(r/a)/B - rot
+        ctx.globalAlpha = (0.75 - j * 0.25) * Math.max(0, 1 - r / maxR);
+        ctx.fillText('*+.'[j], snapX(cx + r * Math.cos(th)) - cw / 2, snapY(cy + r * Math.sin(th)));
+      }
+    }
+
+    ctx.fillStyle = gold;
+    for (const s of stars) {
+      ctx.globalAlpha = 0.15 + 0.45 * (0.5 + 0.5 * Math.sin(s.ph + t * s.sp));
+      ctx.fillText(s.c, s.x * W, s.y * H);
+    }
+
+    // a rare shooting star
+    if (!reduce && !shoot && age > nextShoot) {
+      shoot = { x: rand(W * 0.3, W), y: rand(0, H * 0.4), t0: t };
+      nextShoot = age + rand(6000, 14000);
+    }
+    if (shoot) {
+      const p = (t - shoot.t0) / 900;
+      if (p > 1) shoot = null;
+      else {
+        for (let j = 0; j < 8; j++) {
+          const q = Math.max(0, p - j * 0.02);
+          ctx.globalAlpha = (1 - p) * (1 - j / 8) * 0.9;
+          ctx.fillText(j ? '/' : '*', shoot.x - q * W * 0.35, shoot.y + q * H * 0.25);
+        }
+      }
     }
     ctx.globalAlpha = 1;
+    last = t;
   }
 
   function loop(t) {
-    if (t - last > 33) { draw(t); last = t; } // ~30 fps is plenty for ascii
+    if (t - last > 33) draw(t); // ~30 fps is plenty for ascii
     requestAnimationFrame(loop);
   }
 
   resize();
   addEventListener('resize', () => { resize(); draw(performance.now()); });
-  addEventListener('pointermove', (e) => {
-    mx = e.clientX / W * 2 - 1;
-    my = e.clientY / H * 2 - 1;
-  });
-  if (reduce) draw(0);
+  if (reduce) draw(performance.now());
   else requestAnimationFrame(loop);
   sky.classList.add('on');
+}
+
+/* ---------- φ digits ---------- */
+
+function isqrt(n) {
+  let x = 1n << BigInt((n.toString(2).length >> 1) + 1); // start above √n, Newton walks down
+  for (;;) {
+    const y = (x + n / x) >> 1n;
+    if (y >= x) return x;
+    x = y;
+  }
+}
+
+// φ = (1 + √5) / 2 to `n` decimal places, exact (BigInt)
+function phiDigits(n) {
+  const s = 10n ** BigInt(n);
+  const v = ((s + isqrt(5n * s * s)) / 2n).toString();
+  return v[0] + '.' + v.slice(1);
 }
 
 /* ---------- reveal ---------- */
@@ -314,7 +486,7 @@ async function reveal() {
   document.body.classList.add('light');
   document.querySelector('meta[name=theme-color]').content = '#f3eef0';
   box.replaceChildren();
-    poem.classList.remove('out');
+  poem.classList.remove('out');
   poem.classList.add('dream');
   await sleep(1400);
   await showLine(box, 'the digits never end.', 80);
@@ -334,6 +506,14 @@ async function reveal() {
   await type(out, '{pink:' + (1 + Math.sqrt(5)) / 2 + '}', 25);
   await sleep(1200);
   end.querySelector('.note').hidden = false;
+
+  // the machine keeps counting after the story ends, one digit at a time
+  const digits = end.querySelector('.digits');
+  const D = phiDigits(1000);
+  for (let i = 18; i <= D.length; i++) {
+    digits.textContent = D.slice(0, i);
+    await sleep(rand(1200, 2600));
+  }
 }
 
 /* ---------- boot ---------- */
@@ -348,7 +528,7 @@ window.skip = () => {
 console.log(
   '%c[φ-lab] note for whoever opened this console:\n\n' +
     "hi. you're the first one here in 1618 days.\n" +
-    "I've been measuring sunflowers and counting the sky. nobody asked me to.\n" +
+    "I've been measuring sunflowers and counting the sky.\n" +
     "if the log is too slow, type skip() and I'll jump ahead.\n" +
     "I won't take it personally. ^_^",
   'color:#ff4fa3;font-family:monospace;line-height:1.6'
@@ -359,8 +539,8 @@ document.addEventListener('visibilitychange', () => {
 });
 
 (async () => {
-  await sleep(600);
-  await runScript();
+  newLine(); // empty screen with a blinking cursor while the machine powers on
+  await runLog();
   intro = false;
   skipping = false;
   await ask();

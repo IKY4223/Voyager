@@ -45,9 +45,11 @@ html, body {
   white-space: pre-wrap;
   word-break: break-word;
   transition: opacity .9s ease, filter .9s ease;
+  animation: poweron .7s ease-out 1.4s both;
 }
 .term.fade { opacity: 0; filter: blur(4px); }
 .ln { min-height: 1.6em; }
+.think { color: #e9dcc6; }
 .cur::after { content: "_"; animation: blink 1s steps(1) infinite; }
 
 .ok { color: var(--ok); }
@@ -116,6 +118,14 @@ html, body {
   color: var(--pink);
 }
 .end .num { margin: 4px 0 0; min-height: 1.6em; letter-spacing: .06em; }
+.end .digits {
+  margin: 10px 0 0;
+  max-width: min(64ch, 90vw);
+  min-height: 1.6em;
+  font-size: 11px;
+  color: var(--dim);
+  word-break: break-all;
+}
 .end .note { margin: 28px 0 0; color: var(--dim); font-size: 12px; animation: rise 1.6s ease both; }
 
 
@@ -141,6 +151,11 @@ html, body {
   animation: flicker 6s infinite;
 }
 
+@keyframes poweron {
+  0% { transform: scaleY(.004); filter: brightness(4); opacity: .8; }
+  60% { transform: scaleY(1); filter: brightness(1.6); }
+  100% { transform: none; filter: none; opacity: 1; }
+}
 @keyframes blink { 50% { opacity: 0; } }
 @keyframes in { to { opacity: 1; filter: blur(0); } }
 @keyframes rise { from { opacity: 0; transform: translateY(12px); filter: blur(6px); } }
