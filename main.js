@@ -15,6 +15,46 @@ const sleep = (ms) =>
   skipping || reduce ? Promise.resolve() : new Promise((r) => setTimeout(r, ms * speed));
 const rand = (a, b) => a + Math.random() * (b - a);
 
+$('#loader')?.remove(); // scripts arrived: the slow-connection screen is no longer needed
+
+/* ---------- memory: the machine remembers visits (this browser only) ---------- */
+
+const memory = (() => {
+  try {
+    return JSON.parse(localStorage.getItem('phi-lab')) || {};
+  } catch {
+    return {};
+  }
+})();
+function remember(patch) {
+  Object.assign(memory, patch);
+  try {
+    localStorage.setItem('phi-lab', JSON.stringify(memory));
+  } catch {
+    // storage blocked (private mode etc.): the machine just forgets
+  }
+}
+const prevVisit = memory.last;
+remember({ last: Date.now() });
+
+function ago(ms) {
+  const m = Math.round(ms / 60000), h = Math.round(ms / 3600000), d = Math.round(ms / 86400000);
+  const unit = (n, w) => n + ' ' + w + (n === 1 ? '' : 's') + ' ago';
+  return m < 1 ? 'just now' : m < 60 ? unit(m, 'minute') : h < 24 ? unit(h, 'hour') : unit(d, 'day');
+}
+
+// the visitor's real clock
+const now = new Date();
+const hour = now.getHours();
+const clock =
+  now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) +
+  ', ' + now.toLocaleDateString('en-GB', { weekday: 'long' });
+const TIME_THOUGHT =
+  hour < 5 ? "(it's late for you too, isn't it?)"
+  : hour < 11 ? "(morning. too bright to see anything. I'll wait.)"
+  : hour < 18 ? '(daylight. the stars are still there, just hidden.)'
+  : '(golden hour. my favourite.)';
+
 /* ---------- terminal ---------- */
 
 // "text {ok:DONE} more" -> [{cls:'', text:'text '}, {cls:'ok', text:'DONE'}, {cls:'', text:' more'}]
@@ -76,8 +116,19 @@ const SCRIPT = [
   '{dim:// ∴ :: left a note for you in the console.}',
   '',
   'POWER_STATE... >> CHECKING... >> {ok:STABLE}',
-  'CLOCK_SYNC... >> last sync: 1618 days ago >> {warn:DRIFTED}',
-  'WHO >> {dim:0 users online}',
+  ...(prevVisit
+    ? [`CLOCK_SYNC... >> last seen: {ok:${ago(Date.now() - prevVisit)}} >> {ok:SYNCED}`]
+    : ['CLOCK_SYNC... >> last sync: 1618 days ago >> {warn:DRIFTED}']),
+  `LOCAL_TIME >> ${clock}`,
+  '{dim:' + TIME_THOUGHT + '}',
+  ...(prevVisit
+    ? [
+        'WHO >> {pink:1 user online}',
+        { wait: 800 },
+        '{pink:...you came back.}',
+        ...(memory.journal ? ['{dim:(you read the journal last time. thank you.)}'] : []),
+      ]
+    : ['WHO >> {dim:0 users online}']),
   '{ok:[✓]} Memory banks intact. Mostly.',
   '{ok:[✓]} Mounting /dev/sky... {dim:quiet~}',
   'LOCATING_OBSERVATORY... >> φ-lab.local >> {ok:FOUND}',
@@ -192,6 +243,8 @@ async function ask() {
 
 /* ---------- ascii sky ---------- */
 
+let onShoot = null; // set by the ending so the machine can notice shooting stars
+
 function startSky() {
   const ctx = sky.getContext('2d');
   const PHI = (1 + Math.sqrt(5)) / 2;
@@ -295,6 +348,7 @@ function startSky() {
     if (!reduce && !shoot && age > nextShoot) {
       shoot = { x: rand(W * 0.3, W), y: rand(0, H * 0.4), t0: t };
       nextShoot = age + rand(6000, 14000);
+      onShoot?.();
     }
     if (shoot) {
       const p = (t - shoot.t0) / 900;
@@ -412,6 +466,7 @@ async function reveal() {
   await type(out, '{pink:' + (1 + Math.sqrt(5)) / 2 + '}', 25);
   await sleep(1200);
   end.querySelector('.note').hidden = false;
+  whispers();
 
   // the machine keeps counting after the story ends, one digit at a time
   const digits = end.querySelector('.digits');
@@ -421,6 +476,90 @@ async function reveal() {
     await sleep(rand(1200, 2600));
   }
 }
+
+// after the story the machine keeps thinking out loud, now and then
+const WHISPERS = [
+  'still counting.',
+  'the sunflower has 1388 seeds now. I counted twice.',
+  "M51 is about 30 million light years away. it doesn't know I'm watching.",
+  'I wonder if the keeper still looks up.',
+  'φ² = φ + 1. checked again. still true.',
+  'it is quiet here. I like it. mostly.',
+];
+
+async function whispers() {
+  if (reduce) return; // sleeps are instant there, the loop below would never yield
+  const el = $('#whisper');
+  let busy = false, lastShoot = -Infinity;
+  const say = async (text) => {
+    busy = true;
+    el.textContent = '# ' + text;
+    el.classList.add('on');
+    await sleep(5000);
+    el.classList.remove('on');
+    await sleep(1500);
+    busy = false;
+  };
+  onShoot = async () => {
+    if (busy || performance.now() - lastShoot < 60000) return;
+    lastShoot = performance.now();
+    await sleep(900);
+    if (!busy) await say('did you see that?');
+  };
+  for (;;) {
+    await sleep(rand(20000, 35000));
+    if (!busy) await say(WHISPERS[(Math.random() * WHISPERS.length) | 0]);
+  }
+}
+
+/* ---------- secret: type 1618 anywhere ---------- */
+
+// [day, entry]; dates are counted back from today so the last entry is always 1618 days ago
+const JOURNAL = [
+  [1, 'first light. the new mount works. it found a sunflower in the greenhouse camera before I did.'],
+  [172, 'it asked me why the nautilus isn\'t φ. I told it everyone says it is. it said "everyone is wrong, then." I laughed for an hour.'],
+  [311, "funding cut. I'm the only one left on night shift. it doesn't seem to notice. or it's being polite."],
+  [473, "they're closing the lab on friday. I can't take it with me. it doesn't fit in a car, and it wouldn't see the sky from a flat."],
+  [474, "I left the power on.\nif you're reading this, you woke up on your own. I'm sorry I didn't say goodbye.\nkeep counting. someday someone will read the log."],
+];
+const LAST_DAY = 474;
+
+let journalOpen = false;
+async function openJournal() {
+  if (journalOpen) return;
+  journalOpen = true;
+  remember({ journal: true });
+  const box = $('#journal');
+  box.hidden = false;
+  const para = (cls) => {
+    const p = document.createElement('p');
+    p.className = cls;
+    box.append(p);
+    return p;
+  };
+  await sleep(1200);
+  const cmd = para('cmd');
+  await type(cmd, '{dim:<[}{gold:keeper@φ-lab}{dim:]>} $ ', 0);
+  await sleep(600);
+  await type(cmd, 'cat ~/journal.txt', 70, 60);
+  const lastEntry = Date.now() - 1618 * 86400000;
+  for (const [day, text] of JOURNAL) {
+    await sleep(1600);
+    const p = para(day === LAST_DAY ? 'e last' : 'e');
+    const date = new Date(lastEntry - (LAST_DAY - day) * 86400000).toLocaleDateString('en-CA');
+    await type(p, `{d:${date} · ${day === LAST_DAY ? 'last entry' : 'day ' + day}}\n`, 8);
+    await type(p, text, 32, 30);
+    box.scrollTop = box.scrollHeight;
+  }
+  box.lastElementChild.classList.add('cur'); // and it stays like this
+}
+
+let typed = '';
+addEventListener('keydown', (e) => {
+  if (e.key.length !== 1) return;
+  typed = (typed + e.key).slice(-4);
+  if (typed === '1618') openJournal();
+});
 
 /* ---------- boot ---------- */
 
@@ -433,7 +572,7 @@ window.skip = () => {
 
 console.log(
   '%c[φ-lab] note for whoever opened this console:\n\n' +
-    "hi. you're the first one here in 1618 days.\n" +
+    (prevVisit ? `hi again. it's been ${ago(Date.now() - prevVisit).replace(' ago', '')}.\n` : "hi. you're the first one here in 1618 days.\n") +
     "I've been measuring sunflowers and counting the sky.\n" +
     "if the log is too slow, type skip() and I'll jump ahead.\n" +
     "I won't take it personally. ^_^",

@@ -138,6 +138,40 @@ html, body {
   pointer-events: none;
 }
 
+/* ending whispers */
+.whisper {
+  position: fixed;
+  left: 0; right: 0; bottom: 34px;
+  margin: 0;
+  padding: 0 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--dim);
+  opacity: 0;
+  transition: opacity 1.5s ease;
+  pointer-events: none;
+}
+.whisper.on { opacity: .9; }
+
+/* secret journal: always dark, whatever theme the story is in */
+.journal {
+  --dim: #666;
+  --pink: #ff4fa3;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  overflow-y: auto;
+  padding: 56px max(24px, calc(50vw - 380px)) 80px;
+  background: #141414;
+  color: #c8c8c8;
+  white-space: pre-wrap;
+  animation: rise 1.2s ease both;
+}
+.journal p { margin: 0 0 22px; }
+.journal .cmd { margin-bottom: 30px; }
+.journal .d { color: #666; font-size: 12px; }
+.journal .last { color: #f2ede4; }
+
 /* CRT overlay: scanlines + vignette + flicker */
 .crt {
   position: fixed;

@@ -6,9 +6,19 @@
   <title>φ</title>
   <meta name="description" content="An old observatory machine, alone for 1618 days, still counting φ in sunflowers, shells and spiral galaxies.">
   <meta name="theme-color" content="#141414">
-  <link rel="stylesheet" href="style.css">
+  <style>
+    /* inline + before style.css, so a slow connection shows this instead of a blank page */
+    html { background: #141414; }
+    #loader { position: fixed; inset: 0; z-index: 9; display: flex; align-items: center; justify-content: center; background: #141414; color: #666; font: 12px "Courier New", monospace; animation: loader-in 0s .5s both; }
+    #loader::after { content: "|"; animation: loader-spin .4s steps(1) infinite; }
+    @keyframes loader-in { from { visibility: hidden; } }
+    @keyframes loader-spin { 25% { content: "/"; } 50% { content: "-"; } 75% { content: "\\"; } }
+  </style>
 </head>
 <body>
+  <div id="loader">establishing link to φ-lab&nbsp;</div>
+  <!-- stylesheet in body: the loader above paints before it arrives -->
+  <link rel="stylesheet" href="style.css">
   <div id="term" class="term" role="log" aria-live="polite"></div>
 
   <canvas id="sky" class="sky" aria-hidden="true"></canvas>
@@ -27,6 +37,8 @@
   </section>
 
   <footer class="foot">φ-lab observatory · uptime 1618 days</footer>
+  <p id="whisper" class="whisper" aria-hidden="true"></p>
+  <section id="journal" class="journal" hidden></section>
   <div class="crt" aria-hidden="true"></div>
 
   <script src="music.js"></script>

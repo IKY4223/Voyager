@@ -32,6 +32,23 @@ const assert = require('assert');
   assert.strictEqual(await page.evaluate(() => skip()), 'ok. skipping the boring part.');
   await page.waitForFunction(() => document.body.innerText.includes('RENDER golden_hour?'), null, { timeout: 5000 });
 
+  assert.strictEqual(await page.$('#loader'), null, 'loader must be gone once scripts run');
+
+  // typing 1618 opens the keeper's journal, which types out to the last entry
+  await page.goto('file://' + path.resolve(__dirname, '../index.html') + '?fast');
+  await page.waitForTimeout(500);
+  await page.keyboard.type('1618');
+  await page.waitForSelector('#journal:not([hidden])', { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelector('#journal').innerText.includes('someone will read the log.'), null, { timeout: 30000 });
+  assert(await page.textContent('#journal').then((t) => t.includes('last entry')));
+
+  // the next visit is remembered (same browser profile)
+  await page.goto('file://' + path.resolve(__dirname, '../index.html') + '?fast');
+  await page.waitForFunction(() => document.body.innerText.includes('you read the journal last time'), null, { timeout: 30000 });
+  assert(await page.textContent('#term').then((t) => t.includes('you came back.')));
+  assert(await page.textContent('#term').then((t) => t.includes('1 user online')));
+  assert.deepStrictEqual(errors, []);
+
   await browser.close();
   console.log('ok');
 })().catch((e) => { console.error(e); process.exit(1); });
