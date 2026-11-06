@@ -4,7 +4,6 @@ const $ = (s) => document.querySelector(s);
 const term = $('#term');
 const sky = $('#sky');
 const poem = $('#poem');
-const skipBtn = $('#skip');
 
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // ?fast speeds everything up 20x (used by tests/smoke.cjs)
@@ -67,17 +66,18 @@ async function bar(el, to, end) {
   }
 }
 
-const ME = '{dim:<[}{pink:guest@φ}{dim:]>} ';
-const KEEPER = '{dim:<[}{gold:keeper@φ}{dim:]>} ';
+const ME = '{dim:<[}{pink:sys@φ-lab}{dim:]>} ';
+const KEEPER = '{dim:<[}{gold:keeper@φ-lab}{dim:]>} ';
 
-// string = log line; {cmd} = human typing after a prompt; {bar} = progress bar; {wait} = pause
+// string = log line; {cmd} = typed after a prompt; {bar} = progress bar; {wait} = pause
 const SCRIPT = [
   { prompt: ME, cmd: 'wake --soft' },
-  '{dim:// note :: если ты это читаешь — значит, свет ещё горит.}',
-  '{dim:// ∴ :: cat ./readme_for_whoever.txt}',
+  '{dim:// note :: if you can read this, the lights are still on.}',
+  '{dim:// ∴ :: left a note for you in the console.}',
   '',
   'POWER_STATE... >> CHECKING... >> {ok:STABLE}',
-  'CLOCK_SYNC... >> last seen: 1618 days ago >> {warn:DRIFTED}',
+  'CLOCK_SYNC... >> last sync: 1618 days ago >> {warn:DRIFTED}',
+  'WHO >> {dim:0 users online}',
   '{ok:[✓]} Memory banks intact. Mostly.',
   '{ok:[✓]} Mounting /dev/sky... {dim:quiet~}',
   'LOCATING_OBSERVATORY... >> φ-lab.local >> {ok:FOUND}',
@@ -90,39 +90,47 @@ const SCRIPT = [
   'TELESCOPE[arm_0] >> lens_cap: {warn:ON}',
   { wait: 600 },
   'TELESCOPE[arm_0] >> lens_cap: OFF >> {ok:CLEAR}',
-  '{dim:(...давай сделаем вид, что этого не было.)}',
+  "{dim:(...let's pretend that didn't happen.)}",
   '',
   { prompt: ME + '$ ', cmd: 'su - keeper' },
   'Password: ',
   { prompt: '', cmd: '********' },
   KEEPER + 'auth() >> {ok:OK} (role: KEEPER, shift: night)',
-  { text: 'SCANNING_SKY...', bar: 100, end: '{ok:DONE}' },
-  'COUNT(stars) >> 8 954 112',
-  'FILTER(stars, ratio == φ) >> {pink:1 found}',
-  '{blue:[INFO]} a / b == (a + b) / a >> подходит только одно число.',
+  '{dim:last keeper login: 1618 days ago. it was me.}',
+  '',
+  { text: 'GREENHOUSE.cam[2] >> sunflower', bar: 100, end: '{ok:CAPTURED}' },
+  'SEED_ANGLE(sunflower) >> {gold:137.507°} between every seed',
+  { text: 'ARCHIVE >> nautilus_shell.scan', bar: 100, end: '{ok:LOADED}' },
+  'CHAMBER_RATIO(nautilus) >> 1.33 >> {warn:not φ. people always said it was.}',
+  { text: 'SCANNING_SKY >> M51, the Whirlpool', bar: 100, end: '{ok:DONE}' },
+  'ARM_SHAPE(M51) >> logarithmic spiral >> {gold:close to φ. close enough.}',
+  'COUNT(observers) >> {dim:0}',
   '',
   { prompt: KEEPER + '$ ', cmd: 'compute --ratio 1.6180339887' },
+  'φ = 1 + 1/(1 + 1/(1 + 1/(1 + …))) >> {gold:only ones, all the way down}',
   'SEQ[1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144 ...] >> {gold:converging}',
   { text: 'ITERATE[1 -> 233]', bar: 100, end: '{ok:DONE}' },
   { text: 'ITERATE[233 -> 46368]', bar: 100, end: '{ok:DONE}' },
   'ITERATE[46368 -> ∞] >> LOOPING {gold:1.618033988749894...}',
   { wait: 900 },
-  '{warn:[WARN]} Бесконечность — не число. Выходим аккуратно...',
-  '{ok:[✓]} Спираль собрана. Пахнет дождём. ^_^',
+  '{warn:[WARN]} Infinity is not a number. Breaking out gently...',
+  '{ok:[✓]} Spiral resolved. Smells like rain. ^_^',
   '',
-  '{pink:[REMINDER]} φ² = φ + 1. Проверь сам: 2.618… = 1.618… + 1~',
-  '{pink:[REMINDER]} Здесь нет ничего официального. Только греческая буква и немного математики.',
+  '{pink:[REMINDER]} φ² = φ + 1. 2.618… = 1.618… + 1. still true. checked again.',
+  '{warn:[WARN]} nobody is reading this log.',
+  { wait: 1200 },
+  '{dim:...probably.}',
   '',
   '{dim:<p::render>} MANIFEST >> codename: golden_hour >> {ok:READY}',
-  'Твоя очередь~',
+  'Your turn~',
 ];
 
 const QUIPS = [
-  '(Это просто Y. Или любая клавиша.)',
-  '(Клик тоже считается. Я не привередливый~)',
-  '(Всё ещё здесь? Я тоже~)',
-  '(Y. Между T и U.)',
-  '(Я подожду. Я умею ждать. 1618 дней, помнишь?)',
+  "(It's just Y. Or any key.)",
+  '(A tap works too.)',
+  "(Still there? It's been a while since anyone was.)",
+  '(Y. Between T and U.)',
+  "(I can wait. I'm very good at waiting. 1618 days, remember?)",
 ];
 
 async function runScript() {
@@ -257,12 +265,15 @@ function startSky() {
 
 /* ---------- reveal ---------- */
 
+// the machine talking to itself: odd lines ask, even lines answer
 const VERSE = [
-  'φ = (1 + √5) / 2 = 1.6180339887…',
-  'φ² = φ + 1 — квадрат больше себя ровно на единицу,',
-  '1 / φ = φ − 1 — и обратное число теряет только целую часть.',
-  'Fₙ₊₁ / Fₙ → φ — к нему сходится Фибоначчи.',
-]
+  '— Who taught the sunflower to turn 137.5° between its seeds?',
+  '— No one. It simply never stopped turning.',
+  '— And the shell? They always said it grew by φ.',
+  "— It doesn't. It never corrected them, either.",
+  '— Then who am I counting for?',
+  '— For no one. Like them. The pattern holds anyway.',
+];
 
 async function showLine(box, text, step = 45) {
   const p = document.createElement('p');
@@ -286,7 +297,6 @@ async function showLine(box, text, step = 45) {
 }
 
 async function reveal() {
-  skipBtn.hidden = true;
   term.classList.add('fade');
   await sleep(1000);
   term.hidden = true;
@@ -304,34 +314,54 @@ async function reveal() {
   document.body.classList.add('light');
   document.querySelector('meta[name=theme-color]').content = '#f3eef0';
   box.replaceChildren();
-  poem.querySelector('.label').textContent = '';
-  poem.classList.remove('out');
+    poem.classList.remove('out');
   poem.classList.add('dream');
   await sleep(1400);
-  await showLine(box, 'φ — в честь Фидия, строителя Парфенона,', 70);
+  await showLine(box, 'the digits never end.', 80);
   await sleep(900);
-  await showLine(box, 'а семечки подсолнуха идут через 137.5°.', 70);
+  await showLine(box, 'neither do I.', 80);
   await sleep(2600);
   poem.classList.add('out');
   await sleep(1600);
   poem.hidden = true;
-  $('#end').hidden = false;
+
+  const end = $('#end');
+  end.hidden = false;
+  await sleep(1800);
+  const [cmd, out] = end.querySelectorAll('.num');
+  await type(cmd, '{dim:>} console.log(φ)', 70, 50);
+  await sleep(600);
+  await type(out, '{pink:' + (1 + Math.sqrt(5)) / 2 + '}', 25);
+  await sleep(1200);
+  end.querySelector('.note').hidden = false;
 }
 
 /* ---------- boot ---------- */
 
-function skip() {
-  if (intro) skipping = true;
-}
-skipBtn.addEventListener('click', skip);
-addEventListener('keydown', (e) => { if (e.key === 'Escape') skip(); });
-$('#replay').addEventListener('click', () => location.reload());
+// the only way to skip the log: type skip() in the browser console, like sitting at the machine
+window.skip = () => {
+  if (!intro) return 'already awake.';
+  skipping = true;
+  return 'ok. skipping the boring part.';
+};
+
+console.log(
+  '%c[φ-lab] note for whoever opened this console:\n\n' +
+    "hi. you're the first one here in 1618 days.\n" +
+    "I've been measuring sunflowers and counting the sky. nobody asked me to.\n" +
+    "if the log is too slow, type skip() and I'll jump ahead.\n" +
+    "I won't take it personally. ^_^",
+  'color:#ff4fa3;font-family:monospace;line-height:1.6'
+);
+
+document.addEventListener('visibilitychange', () => {
+  document.title = document.hidden ? '…still counting' : 'φ';
+});
 
 (async () => {
   await sleep(600);
   await runScript();
   intro = false;
-  skipBtn.hidden = true;
   skipping = false;
   await ask();
   await reveal();

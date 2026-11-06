@@ -32,6 +32,7 @@ html, body {
   background: var(--bg);
   color: var(--fg);
   font: 14px/1.6 "Courier New", Courier, ui-monospace, monospace;
+  cursor: default;
   transition: background-color 1.4s ease, color 1.4s ease;
 }
 
@@ -85,6 +86,7 @@ html, body {
 .poem.out { opacity: 0; filter: blur(8px); }
 .poem .label { margin: 0 0 6px; font-size: 11px; color: var(--dim); text-shadow: none; }
 .poem .line { margin: .55em 0; }
+.poem .line:nth-child(odd) { opacity: .55; }
 .poem.dream { text-align: left; font-size: clamp(18px, 2.4vw, 26px); }
 .word { white-space: nowrap; }
 .ch {
@@ -107,27 +109,15 @@ html, body {
   animation: rise 1.6s ease both;
 }
 .end h1 {
-  margin: 0;
+  margin: 0 0 24px;
   font-weight: 400;
   font-size: clamp(96px, 20vw, 240px);
   line-height: 1;
   color: var(--pink);
 }
-.end .num { margin: 8px 0 0; letter-spacing: .3em; color: var(--dim); }
-.end .note { margin: 28px 0; }
+.end .num { margin: 4px 0 0; min-height: 1.6em; letter-spacing: .06em; }
+.end .note { margin: 28px 0 0; color: var(--dim); font-size: 12px; animation: rise 1.6s ease both; }
 
-.btn, .skip {
-  font: inherit;
-  color: var(--dim);
-  background: none;
-  border: 1px solid transparent;
-  padding: 6px 10px;
-  cursor: pointer;
-}
-.btn { border-color: var(--dim); }
-.btn:hover, .skip:hover, .btn:focus-visible, .skip:focus-visible { color: var(--pink); border-color: var(--pink); outline: none; }
-
-.skip { position: fixed; right: 16px; bottom: 34px; font-size: 12px; z-index: 3; }
 
 .foot {
   position: fixed;

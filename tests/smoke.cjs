@@ -19,12 +19,13 @@ const assert = require('assert');
   await page.waitForSelector('#poem:not([hidden])', { timeout: 15000 });
   await page.waitForSelector('#end:not([hidden])', { timeout: 30000 });
   assert(await page.evaluate(() => document.body.classList.contains('light')), 'ending must be in light theme');
+  await page.waitForFunction(() => document.querySelector('#end').innerText.includes('1.618033988749895'), null, { timeout: 10000 });
   assert.deepStrictEqual(errors, []);
 
-  // Esc skips the log straight to the prompt
+  // skip() typed in the browser console jumps the log straight to the prompt
   await page.goto('file://' + path.resolve(__dirname, '../index.html'));
   await page.waitForTimeout(1500);
-  await page.keyboard.press('Escape');
+  assert.strictEqual(await page.evaluate(() => skip()), 'ok. skipping the boring part.');
   await page.waitForFunction(() => document.body.innerText.includes('RENDER golden_hour?'), null, { timeout: 5000 });
 
   await browser.close();
