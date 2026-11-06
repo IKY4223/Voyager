@@ -99,7 +99,7 @@ const SCRIPT = [
   { text: 'SCANNING_SKY...', bar: 100, end: '{ok:DONE}' },
   'COUNT(stars) >> 8 954 112',
   'FILTER(stars, ratio == φ) >> {pink:1 found}',
-  '{blue:[INFO]} Цель маленькая. Цель далеко. Цель — наша.',
+  '{blue:[INFO]} a / b == (a + b) / a >> подходит только одно число.',
   '',
   { prompt: KEEPER + '$ ', cmd: 'compute --ratio 1.6180339887' },
   'SEQ[1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144 ...] >> {gold:converging}',
@@ -110,8 +110,8 @@ const SCRIPT = [
   '{warn:[WARN]} Бесконечность — не число. Выходим аккуратно...',
   '{ok:[✓]} Спираль собрана. Пахнет дождём. ^_^',
   '',
-  '{pink:[REMINDER]} Эй, ты — да, ты, по ту сторону стекла~',
-  '{pink:[REMINDER]} Здесь нет ничего официального. Это просто огонёк, оставленный для кого-то.',
+  '{pink:[REMINDER]} φ² = φ + 1. Проверь сам: 2.618… = 1.618… + 1~',
+  '{pink:[REMINDER]} Здесь нет ничего официального. Только греческая буква и немного математики.',
   '',
   '{dim:<p::render>} MANIFEST >> codename: golden_hour >> {ok:READY}',
   'Твоя очередь~',
@@ -258,11 +258,11 @@ function startSky() {
 /* ---------- reveal ---------- */
 
 const VERSE = [
-  'Я считал тебя до бесконечности —',
-  'сбивался и опять считал с нуля.',
-  'Как меньшее к большему, большее — к целому,',
-  'так ты ко мне. Так небо — к земле.',
-];
+  'φ = (1 + √5) / 2 = 1.6180339887…',
+  'φ² = φ + 1 — квадрат больше себя ровно на единицу,',
+  '1 / φ = φ − 1 — и обратное число теряет только целую часть.',
+  'Fₙ₊₁ / Fₙ → φ — к нему сходится Фибоначчи.',
+]
 
 async function showLine(box, text, step = 45) {
   const p = document.createElement('p');
@@ -308,9 +308,9 @@ async function reveal() {
   poem.classList.remove('out');
   poem.classList.add('dream');
   await sleep(1400);
-  await showLine(box, 'мне снится звезда,', 90);
+  await showLine(box, 'φ — в честь Фидия, строителя Парфенона,', 70);
   await sleep(900);
-  await showLine(box, 'и, кажется, я ей тоже.', 90);
+  await showLine(box, 'а семечки подсолнуха идут через 137.5°.', 70);
   await sleep(2600);
   poem.classList.add('out');
   await sleep(1600);
