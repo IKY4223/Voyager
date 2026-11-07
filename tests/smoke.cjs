@@ -40,9 +40,16 @@ const assert = require('assert');
 
   assert.strictEqual(await page.$('#loader'), null, 'loader must be gone once scripts run');
 
-  // typing 1618 opens the keeper's journal, which types out to the last entry
+  // 1618 does nothing during the dark part of the story...
   await page.goto('file://' + path.resolve(__dirname, '../index.html') + '?fast');
   await page.waitForTimeout(500);
+  await page.keyboard.type('1618');
+  await page.waitForTimeout(300);
+  assert(await page.isHidden('#journal'), '1618 must not open the journal before the white page');
+  // ...and opens the keeper's journal on the white ending, which types out to the last entry
+  await page.waitForFunction(() => document.body.innerText.includes('RENDER golden_hour?'), null, { timeout: 30000 });
+  await page.keyboard.press('y');
+  await page.waitForSelector('#end:not([hidden])', { timeout: 30000 });
   await page.keyboard.type('1618');
   await page.waitForSelector('#journal:not([hidden])', { timeout: 5000 });
   await page.waitForFunction(() => document.querySelector('#journal').innerText.includes('someone will read the log.'), null, { timeout: 30000 });
@@ -64,6 +71,9 @@ const assert = require('assert');
   });
   await page.goto('file://' + path.resolve(__dirname, '../index.html') + '?fast');
   await page.waitForFunction(() => document.querySelector('#term').textContent.includes('thirteen. you\'ve been here more than anyone'), null, { timeout: 30000 });
+  await page.waitForFunction(() => document.body.innerText.includes('RENDER golden_hour?'), null, { timeout: 30000 });
+  await page.keyboard.press('y');
+  await page.waitForSelector('#end:not([hidden])', { timeout: 30000 });
   await page.keyboard.type('1618');
   await page.waitForFunction(() => document.querySelector('#journal').innerText.includes("I'll keep counting for both of us."), null, { timeout: 30000 });
   assert.deepStrictEqual(errors, []);

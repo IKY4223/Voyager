@@ -645,14 +645,15 @@ async function openJournal() {
 
 let typed = '';
 addEventListener('keydown', (e) => {
-  if (e.key.length !== 1) return;
+  // the secret only answers on the white (light-theme) part of the story
+  if (e.key.length !== 1 || !document.body.classList.contains('light')) return;
   typed = (typed + e.key).slice(-4);
   if (typed === '1618') openJournal();
 });
 
 /* ---------- boot ---------- */
 
-// the only way to skip the log: type skip() in the browser console, like sitting at the machine
+// hidden helper: skip() in the browser console jumps the log to the prompt (no longer advertised)
 window.skip = () => {
   if (!intro) return 'already awake.';
   skipping = true;
@@ -662,9 +663,7 @@ window.skip = () => {
 console.log(
   '%c[φ-lab] note for whoever opened this console:\n\n' +
     (prevVisit ? `hi again. it's been ${ago(Date.now() - prevVisit).replace(' ago', '')}.\n` : "hi. you're the first one here in 1618 days.\n") +
-    "I've been measuring sunflowers and counting the sky.\n" +
-    "if the log is too slow, type skip() and I'll jump ahead.\n" +
-    "I won't take it personally. ^_^",
+    "I've been measuring sunflowers and counting the sky.",
   'color:#ff4fa3;font-family:monospace;line-height:1.6'
 );
 

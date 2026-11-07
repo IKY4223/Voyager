@@ -115,11 +115,22 @@ html, body {
   font-size: clamp(96px, 20vw, 240px);
   line-height: 1;
   color: var(--pink);
+  text-shadow:
+    0 0 12px color-mix(in srgb, var(--pink) 70%, transparent),
+    0 0 40px color-mix(in srgb, var(--pink) 45%, transparent);
 }
 .end .top { align-self: end; display: grid; justify-items: center; }
 .end p { text-shadow: 0 0 4px var(--bg), 0 0 10px var(--bg), 0 0 18px var(--bg); } /* readable over the sunflower core */
 .end .bottom { align-self: start; display: grid; justify-items: center; }
 .end .num { margin: 4px 0 0; min-height: 1.6em; letter-spacing: .06em; }
+/* the pink console.log output: bigger and glowing like the φ */
+.end .out {
+  font-size: clamp(20px, 2.4vw, 30px);
+  text-shadow:
+    0 0 4px var(--bg),
+    0 0 10px color-mix(in srgb, var(--pink) 80%, transparent),
+    0 0 26px color-mix(in srgb, var(--pink) 50%, transparent);
+}
 .end .digits {
   margin: 10px 0 0;
   max-width: min(64ch, 90vw);
