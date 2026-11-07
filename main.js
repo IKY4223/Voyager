@@ -50,9 +50,9 @@ if (visits === 13) remember({ wrote: Date.now() });
 // Fibonacci visits get their own line
 const VISIT_LINES = {
   3: "(third time. I'm starting to recognise you.)",
-  5: "(five visits. that's a Fibonacci number. I noticed.)",
-  8: '(eight. I keep a light on in the greenhouse for you now.)',
-  13: "(thirteen. I wrote something in the journal. it isn't mine to write in. I did it anyway.)",
+  5: "(five visits. that's a Fibonacci number.)",
+  8: "(eight. I started counting your visits instead of stars. don't tell anyone.)",
+  13: "(thirteen. you've been here more than anyone since the keeper. I left something for you in the journal.)",
 };
 
 // moon phase from the date alone: days since a known new moon (2000-01-06 18:14 UTC), modulo the synodic month

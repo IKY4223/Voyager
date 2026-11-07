@@ -63,7 +63,7 @@ const assert = require('assert');
     localStorage.setItem('phi-lab', JSON.stringify(m));
   });
   await page.goto('file://' + path.resolve(__dirname, '../index.html') + '?fast');
-  await page.waitForFunction(() => document.querySelector('#term').textContent.includes('thirteen. I wrote something'), null, { timeout: 30000 });
+  await page.waitForFunction(() => document.querySelector('#term').textContent.includes('thirteen. you\'ve been here more than anyone'), null, { timeout: 30000 });
   await page.keyboard.type('1618');
   await page.waitForFunction(() => document.querySelector('#journal').innerText.includes("I'll keep counting for both of us."), null, { timeout: 30000 });
   assert.deepStrictEqual(errors, []);
