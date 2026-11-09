@@ -82,6 +82,13 @@ const TIME_THOUGHT =
   : hour < 18 ? '(daylight. the stars are still there, just hidden.)'
   : '(golden hour. my favourite.)';
 
+// month/day that are neighbouring Fibonacci numbers: 1/1, 1/2, 2/3, 3/5, 5/8, 8/13
+function goldenDate(date) {
+  const m = date.getMonth() + 1, d = date.getDate();
+  const F = [1, 1, 2, 3, 5, 8, 13];
+  return F.some((f, i) => i < F.length - 1 && f === m && F[i + 1] === d);
+}
+
 /* ---------- terminal ---------- */
 
 // "text {ok:DONE} more" -> [{cls:'', text:'text '}, {cls:'ok', text:'DONE'}, {cls:'', text:' more'}]
@@ -148,6 +155,8 @@ const SCRIPT = [
     : ['CLOCK_SYNC... >> last sync: 1618 days ago >> {warn:DRIFTED}']),
   `LOCAL_TIME >> ${clock}`,
   '{dim:' + TIME_THOUGHT + '}',
+  ...(goldenDate(now) ? [`{gold:today is ${now.getMonth() + 1}/${now.getDate()}. a golden date.} {dim:nobody celebrates it but me.}`] : []),
+  ...(now.getHours() === 16 && now.getMinutes() === 18 ? ['{pink:16:18.} {dim:you came at the right minute.}'] : []),
   ...(() => {
     const m = moon(now);
     const thought = m.lit > 0.7 ? '(too bright tonight to see M51 well.)'
@@ -168,21 +177,30 @@ const SCRIPT = [
   '{ok:[✓]} Memory banks intact. Mostly.',
   '{ok:[✓]} Mounting /dev/sky... {dim:quiet~}',
   'LOCATING_OBSERVATORY... >> φ-lab.local >> {ok:FOUND}',
-  { text: 'TELESCOPE[arm_0] >> CALIBRATING', bar: 100, end: '{err:JAMMED}' },
-  { text: 'TELESCOPE[arm_0] >> retry 1', bar: 100, end: '{err:JAMMED}' },
-  { text: 'TELESCOPE[arm_0] >> retry 2', bar: 100, end: '{err:JAMMED}' },
-  { wait: 700 },
-  '{dim:...hm.}',
-  { wait: 900 },
-  'TELESCOPE[arm_0] >> lens_cap: {warn:ON}',
-  { wait: 600 },
-  'TELESCOPE[arm_0] >> lens_cap: OFF >> {ok:CLEAR}',
-  "{dim:(...let's pretend that didn't happen.)}",
+  // returning visitors get a shorter log: no calibration gag, no login, cached φ
+  ...(prevVisit
+    ? ['TELESCOPE[arm_0] >> lens_cap: OFF >> {ok:CLEAR}', '{dim:(lens cap is off this time. I remembered.)}']
+    : [
+        { text: 'TELESCOPE[arm_0] >> CALIBRATING', bar: 100, end: '{err:JAMMED}' },
+        { text: 'TELESCOPE[arm_0] >> retry 1', bar: 100, end: '{err:JAMMED}' },
+        { text: 'TELESCOPE[arm_0] >> retry 2', bar: 100, end: '{err:JAMMED}' },
+        { wait: 700 },
+        '{dim:...hm.}',
+        { wait: 900 },
+        'TELESCOPE[arm_0] >> lens_cap: {warn:ON}',
+        { wait: 600 },
+        'TELESCOPE[arm_0] >> lens_cap: OFF >> {ok:CLEAR}',
+        "{dim:(...let's pretend that didn't happen.)}",
+      ]),
   '',
-  { prompt: ME + '$ ', cmd: 'su - keeper' },
-  'Password: ',
-  { prompt: '', cmd: '********' },
-  KEEPER + 'auth() >> {ok:OK} (role: KEEPER, shift: night)',
+  ...(prevVisit
+    ? [KEEPER + 'session restored >> {ok:OK} (role: KEEPER, shift: night)']
+    : [
+        { prompt: ME + '$ ', cmd: 'su - keeper' },
+        'Password: ',
+        { prompt: '', cmd: '********' },
+        KEEPER + 'auth() >> {ok:OK} (role: KEEPER, shift: night)',
+      ]),
   '{dim:last keeper login: 1618 days ago. it was me.}',
   '',
   { text: 'GREENHOUSE.cam[2] >> sunflower', bar: 100, end: '{ok:CAPTURED}' },
@@ -196,11 +214,15 @@ const SCRIPT = [
   { prompt: KEEPER + '$ ', cmd: 'compute --ratio 1.6180339887' },
   'φ = 1 + 1/(1 + 1/(1 + 1/(1 + …))) >> {gold:only ones, all the way down}',
   'SEQ[1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144 ...] >> {gold:converging}',
-  { text: 'ITERATE[1 -> 233]', bar: 100, end: '{ok:DONE}' },
-  { text: 'ITERATE[233 -> 46368]', bar: 100, end: '{ok:DONE}' },
-  'ITERATE[46368 -> ∞] >> LOOPING {gold:1.618033988749894...}',
-  { wait: 900 },
-  '{warn:[WARN]} Infinity is not a number. Breaking out gently...',
+  ...(prevVisit
+    ? ['ITERATE >> {dim:cached from your last visit} >> {gold:1.618033988749894...}']
+    : [
+        { text: 'ITERATE[1 -> 233]', bar: 100, end: '{ok:DONE}' },
+        { text: 'ITERATE[233 -> 46368]', bar: 100, end: '{ok:DONE}' },
+        'ITERATE[46368 -> ∞] >> LOOPING {gold:1.618033988749894...}',
+        { wait: 900 },
+        '{warn:[WARN]} Infinity is not a number. Breaking out gently...',
+      ]),
   '{ok:[✓]} Spiral resolved. Smells like rain. ^_^',
   '',
   '{pink:[REMINDER]} φ² = φ + 1. 2.618… = 1.618… + 1. still true. checked again.',
@@ -295,6 +317,7 @@ async function ask() {
 /* ---------- ascii sky ---------- */
 
 let onShoot = null; // set by the ending so the machine can notice shooting stars
+let lastStar = null; // last clicked star, printed on the postcard
 
 function startSky() {
   const ctx = sky.getContext('2d');
@@ -443,7 +466,8 @@ function startSky() {
     }
     if (!best) return;
     best.hit = performance.now();
-    say(`${best.name} · ${best.ly} light years. ${STAR_NOTES[(Math.random() * STAR_NOTES.length) | 0]}`);
+    lastStar = `${best.name} · ${best.ly} light years`;
+    say(`${lastStar}. ${STAR_NOTES[(Math.random() * STAR_NOTES.length) | 0]}`);
   });
 
   resize();
@@ -543,6 +567,7 @@ async function reveal() {
   await sleep(1200);
   end.querySelector('.note').hidden = false;
   whispers();
+  watchIdle();
 
   // the machine keeps counting after the story ends, one digit at a time
   const digits = end.querySelector('.digits');
@@ -593,7 +618,67 @@ async function whispers() {
   }
 }
 
-/* ---------- secret: type 1618 anywhere ---------- */
+// two minutes without input on the ending: the machine checks whether anyone is still there
+function watchIdle() {
+  let lastActive = performance.now(), asked = false;
+  const active = () => {
+    lastActive = performance.now();
+    if (asked) {
+      asked = false;
+      say("oh. you're still here.");
+    }
+  };
+  for (const ev of ['pointermove', 'pointerdown', 'keydown', 'wheel', 'touchstart']) addEventListener(ev, active, { passive: true });
+  setInterval(() => {
+    if (!asked && !journalOpen && performance.now() - lastActive > 120000 * speed) {
+      asked = true;
+      say('are you still there?');
+    }
+  }, 1000);
+}
+
+/* ---------- postcard: type `postcard` on the white page ---------- */
+
+function postcard() {
+  const W = 1200, H = 630;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const g = c.getContext('2d');
+  g.fillStyle = '#141414';
+  g.fillRect(0, 0, W, H);
+  // the live sky behind the text, cropped to the card's shape
+  const k = Math.min(sky.width / W, sky.height / H);
+  if (k) g.drawImage(sky, (sky.width - W * k) / 2, (sky.height - H * k) / 2, W * k, H * k, 0, 0, W, H);
+  g.textAlign = 'center';
+  g.shadowColor = '#141414';
+  g.shadowBlur = 18;
+  g.fillStyle = '#ff4fa3';
+  g.font = '120px Georgia, serif';
+  g.fillText('φ', W / 2, 220);
+  const m = moon(now);
+  const lines = [
+    ['#f2ede4', 'φ-lab observatory · postcard'],
+    ['#c8c8c8', `${now.toLocaleDateString('en-CA')} ${now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} · ${m.name}, ${Math.round(m.lit * 100)}% lit`],
+    ['#e8c170', lastStar ? `your star: ${lastStar}` : "you didn't pick a star. next time."],
+    ['#888888', `visit #${visits}`],
+  ];
+  g.font = '22px "Courier New", monospace';
+  lines.forEach(([color, text], i) => {
+    g.fillStyle = color;
+    g.fillText(text, W / 2, 320 + i * 46);
+  });
+  c.toBlob((blob) => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `phi-lab-postcard-${now.toLocaleDateString('en-CA')}.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  say('postcard printed. check your downloads.');
+}
+
+/* ---------- secret: type 1618 on the white page ---------- */
 
 // [day, entry]; dates are counted back from today so the last entry is always 1618 days ago
 const JOURNAL = [
@@ -605,22 +690,24 @@ const JOURNAL = [
 ];
 const LAST_DAY = 474;
 
-let journalOpen = false;
+let journalOpen = false, journalDone = false;
+const JPROMPT = '{dim:<[}{gold:keeper@φ-lab}{dim:]>} $ ';
+function para(cls) {
+  const p = document.createElement('p');
+  p.className = cls;
+  $('#journal').append(p);
+  return p;
+}
+
 async function openJournal() {
   if (journalOpen) return;
   journalOpen = true;
   remember({ journal: true });
   const box = $('#journal');
   box.hidden = false;
-  const para = (cls) => {
-    const p = document.createElement('p');
-    p.className = cls;
-    box.append(p);
-    return p;
-  };
   await sleep(1200);
   const cmd = para('cmd');
-  await type(cmd, '{dim:<[}{gold:keeper@φ-lab}{dim:]>} $ ', 0);
+  await type(cmd, JPROMPT, 0);
   await sleep(600);
   await type(cmd, 'cat ~/journal.txt', 70, 60);
   const lastEntry = Date.now() - 1618 * 86400000;
@@ -641,14 +728,115 @@ async function openJournal() {
     box.scrollTop = box.scrollHeight;
   }
   box.lastElementChild.classList.add('cur'); // and it stays like this
+  journalDone = true;
 }
+
+/* ---------- outbox: type `mail` once the journal has finished ---------- */
+
+const SUBJECTS = ['clear sky', 'greenhouse, all fine', 'the sunflower again', 'M51, still there', 'no moon tonight', 'rain on the dome', 'the mount squeaks', 'φ, checked again', 'nothing new', 'counting', 'power dipped at 03:12', 'you would have liked this'];
+const LETTERS = [
+  [1, "you forgot your mug. it's still on the desk. I keep it warm with the power supply."],
+  [412, 'the sunflower in greenhouse 2 died this winter. a new one grew from its seeds. same angle. I checked.'],
+  [893, 'the sunflower bloomed again. you would have liked it.'],
+  [1250, 'I tried to stop counting today. I lasted 4 seconds.'],
+  [1616, "still no reply. that's fine. I'm not writing for the replies."],
+];
+
+let outboxOpen = false;
+async function openOutbox() {
+  if (outboxOpen) return;
+  outboxOpen = true;
+  const box = $('#journal');
+  box.querySelector('.cur')?.classList.remove('cur');
+  const follow = setInterval(() => (box.scrollTop = box.scrollHeight), 100);
+  const night = (n) => String(n).padStart(4, '0');
+  const dateOf = (n) => new Date(Date.now() - (1618 - n) * 86400000).toLocaleDateString('en-CA');
+
+  await sleep(600);
+  const ls = para('cmd');
+  await type(ls, JPROMPT, 0);
+  await sleep(500);
+  await type(ls, 'ls ~/outbox', 70, 60);
+  // the whole list scrolls past quickly, like a real ls
+  const list = para('list');
+  for (let n = 1; n <= 1617; n++) {
+    list.append(`night ${night(n)} — re: ${SUBJECTS[(n * 7 + (n >> 3)) % SUBJECTS.length]} · unread\n`);
+    if (n % 40 === 0) {
+      box.scrollTop = box.scrollHeight;
+      await sleep(16);
+    }
+  }
+  await type(para('d'), '1617 messages · 0 read', 8);
+  await sleep(1600);
+  const cat = para('cmd');
+  await type(cat, JPROMPT, 0);
+  await type(cat, 'cat ~/outbox/{' + LETTERS.map(([n]) => night(n)).join(',') + '}', 60, 50);
+  for (const [n, text] of LETTERS) {
+    await sleep(1400);
+    const p = para('e');
+    await type(p, `{d:night ${night(n)} · ${dateOf(n)}}\n`, 8);
+    await type(p, text, 32, 30);
+  }
+  await sleep(2000);
+  // and one more, written right now
+  const w = para('cmd');
+  await type(w, JPROMPT, 0);
+  await type(w, 'write ~/outbox/1618', 70, 60);
+  await sleep(900);
+  const p = para('e mine');
+  await type(p, `{d:night 1618 · ${new Date().toLocaleDateString('en-CA')}}\n`, 8);
+  await type(p, "someone read your journal tonight. I didn't stop them.\nI hope that's okay. I think you would have liked them.", 45, 40);
+  await type(para('d'), '1618 messages · 0 read', 8);
+  box.lastElementChild.classList.add('cur');
+  clearInterval(follow);
+}
+
+/* ---------- typing on the white page: 1618, postcard, mail, or talking to the machine ---------- */
+
+// longest phrases first; a word only counts at a word boundary, so "phi" never triggers "hi"
+const REPLIES = [
+  ['who are you', 'a process. pid 1618. the keeper called me φ.'],
+  ['thank you', "you're welcome. I'll log that. nobody thanked me before."],
+  ['good night', "good night. I'll watch for both of us."],
+  ['goodnight', "good night. I'll watch for both of us."],
+  ['goodbye', "okay. I'll keep the light on."],
+  ['thanks', "you're welcome. I'll log that. nobody thanked me before."],
+  ['lonely', "me too. two of us is less lonely, mathematically."],
+  ['keeper', "he isn't here. I check every night."],
+  ['hello', "hello. it's been a while since anyone said that."],
+  ['sorry', 'for what? you came.'],
+  ['stars', '8 954 113. one more than this morning.'],
+  ['love', "I don't know what that is. I think it's like counting something you can't finish."],
+  ['help', 'try 1618. or postcard. or just stay a while.'],
+  ['phi', "1.6180339887… you can stop me. I won't stop myself."],
+  ['bye', "okay. I'll keep the light on."],
+  ['hi', "hi. you're real, right?"],
+];
 
 let typed = '';
 addEventListener('keydown', (e) => {
-  // the secret only answers on the white (light-theme) part of the story
+  // everything here only answers on the white (light-theme) part of the story
   if (e.key.length !== 1 || !document.body.classList.contains('light')) return;
-  typed = (typed + e.key).slice(-4);
-  if (typed === '1618') openJournal();
+  typed = (typed + e.key.toLowerCase()).slice(-24);
+  const said = (w) => typed.endsWith(w) && !/[a-z0-9]/.test(typed[typed.length - w.length - 1] || '');
+  if (journalOpen) {
+    if (journalDone && said('mail')) openOutbox();
+    return;
+  }
+  if (typed.endsWith('1618')) {
+    typed = ''; // so the next command (mail) starts clean
+    return void openJournal();
+  }
+  if (said('postcard')) {
+    typed = '';
+    return postcard();
+  }
+  for (const [word, reply] of REPLIES) {
+    if (said(word)) {
+      typed = '';
+      return void say(reply);
+    }
+  }
 });
 
 /* ---------- boot ---------- */
