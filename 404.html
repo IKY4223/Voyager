@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>404 · φ</title>
+  <meta name="robots" content="noindex">
+  <!-- GitHub Pages serves this file for any missing address, at any depth, so it is self-contained:
+       styles are inline and the links assume the site lives at /Phi/ (same assumption as og:image in index.html). -->
+  <link rel="icon" href="/Phi/favicon.svg" type="image/svg+xml">
+  <style>
+    html, body { margin: 0; height: 100%; background: #141414; color: #c8c8c8; font: 14px/1.6 "Courier New", Courier, monospace; cursor: default; user-select: none; -webkit-user-select: none; }
+    main { height: 100%; display: grid; place-content: center; padding: 0 24px; }
+    p { margin: 0 0 .4em; overflow-wrap: anywhere; }
+    .dim { color: #666; }
+    .warn { color: #d9a441; }
+    .pink { color: #ff4fa3; }
+    a { color: #ff4fa3; text-decoration: none; }
+    a:hover, a:focus-visible { text-decoration: underline; outline: none; }
+    .cur::after { content: "_"; animation: blink 1s steps(1) infinite; }
+    .crt { position: fixed; inset: 0; pointer-events: none; background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, .22) 0 1px, transparent 1px 3px), radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, .6)); }
+    @keyframes blink { 50% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .cur::after { animation: none; } }
+  </style>
+</head>
+<body>
+  <main>
+    <p><span class="dim">&lt;[</span><span class="pink">sys@φ-lab</span><span class="dim">]&gt;</span> telescope --point <span id="where"></span></p>
+    <p><span class="warn">404</span> &gt;&gt; this sector of the sky is empty.</p>
+    <p class="dim">(I looked twice. nothing here but dark.)</p>
+    <p>&nbsp;</p>
+    <p class="cur"><a href="/Phi/">cd ~</a> <span class="dim">// back to the observatory</span> </p>
+  </main>
+  <div class="crt" aria-hidden="true"></div>
+  <script>
+    // show the address that was asked for; textContent keeps it inert whatever it contains
+    document.getElementById('where').textContent = location.pathname;
+  </script>
+</body>
+</html>

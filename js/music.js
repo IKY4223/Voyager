@@ -4,10 +4,12 @@
 // a soft piano (rolled chords + a wandering D major pentatonic melody) over quiet pads,
 // echo, long reverb and a little tape hiss.
 // Browsers only allow sound after a user gesture, so call this from a key/tap handler.
+let musicContext = null; // created once, on the first user gesture
+
 function startMusic() {
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC || startMusic.ctx) return;
-  const ctx = (startMusic.ctx = new AC());
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass || musicContext) return;
+  const ctx = (musicContext = new AudioContextClass());
   ctx.resume();
   const now = ctx.currentTime;
 

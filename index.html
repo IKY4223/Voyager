@@ -7,7 +7,7 @@
   <meta name="description" content="An old observatory machine, alone for 1618 days, still counting φ in sunflowers, shells and spiral galaxies.">
   <meta name="theme-color" content="#141414">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <!-- link previews (Telegram, Discord, ...): the image URL must be absolute, this assumes GitHub Pages -->
+  <!-- link previews (Telegram, Discord, ...): the image URL must be absolute; this one assumes GitHub Pages -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="φ">
   <meta property="og:description" content="1618 days since last user.">
@@ -16,37 +16,44 @@
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <style>
-    /* inline + before style.css, so a slow connection shows this instead of a blank page */
+    /* Inline and ahead of style.css, so a slow connection shows this instead of a blank page.
+       It only becomes visible after half a second: fast connections never see it. */
     html { background: #141414; }
     #loader { position: fixed; inset: 0; z-index: 9; display: flex; align-items: center; justify-content: center; background: #141414; color: #666; font: 12px "Courier New", monospace; letter-spacing: .1em; animation: loader-in 0s .5s both; }
     @keyframes loader-in { from { visibility: hidden; } }
   </style>
 </head>
 <body>
-  <div id="loader"><span>Loading <span id="pct">0</span>%</span></div>
+  <div id="loader"><span>Loading <span id="loading-percent">0</span>%</span></div>
   <script>
-    // shortcut: the percentage is estimated (eases toward 90%) until main.js sets 100%; real byte progress would need streamed fetches
+    // The percentage is an estimate: it eases toward 90% and js/main.js sets 100% once everything has loaded.
+    // (A page cannot see real download progress without fetching its own files by hand.)
     (function () {
-      var p = 0, el = document.getElementById('pct');
-      window.loadTimer = setInterval(function () { p += (90 - p) * 0.08; el.textContent = Math.floor(p); }, 100);
+      var percent = 0, label = document.getElementById('loading-percent');
+      window.loadingTimer = setInterval(function () {
+        percent += (90 - percent) * 0.08;
+        label.textContent = Math.floor(percent);
+      }, 100);
     })();
   </script>
-  <!-- stylesheet in body: the loader above paints before it arrives -->
+  <!-- stylesheet in the body on purpose: the loader above paints before it arrives -->
   <link rel="stylesheet" href="style.css">
+
+  <!-- 1. the log -->
   <div id="term" class="term" role="log" aria-live="polite"></div>
 
+  <!-- 2. the sky and the machine talking to itself -->
   <canvas id="sky" class="sky" aria-hidden="true"></canvas>
-
   <section id="poem" class="poem" hidden>
     <p class="label">// thinking out loud</p>
     <div class="lines"></div>
   </section>
 
+  <!-- 3. the ending: three rows, so the pink console.log output sits exactly in the middle of the screen -->
   <section id="end" class="end" hidden>
-    <!-- three rows: the pink console.log output sits exactly in the middle of the screen -->
-    <div class="top"><h1>φ</h1><p class="num"></p></div>
-    <p class="num out"></p>
-    <div class="bottom">
+    <p class="command"></p>
+    <p class="output"></p>
+    <div class="after">
       <p class="note" hidden>process still running · last login: 1618 days ago</p>
       <p class="digits"></p>
     </div>
@@ -54,10 +61,20 @@
 
   <footer class="foot">φ-lab observatory · uptime 1618 days</footer>
   <p id="whisper" class="whisper" aria-hidden="true"></p>
+
+  <!-- secret: the keeper's journal -->
   <section id="journal" class="journal" hidden></section>
+
   <div class="crt" aria-hidden="true"></div>
 
-  <script src="music.js"></script>
-  <script src="main.js"></script>
+  <!-- plain scripts in dependency order (no modules, so the page also works opened from disk) -->
+  <script src="js/core.js"></script>
+  <script src="js/story.js"></script>
+  <script src="js/music.js"></script>
+  <script src="js/sky.js"></script>
+  <script src="js/terminal.js"></script>
+  <script src="js/ending.js"></script>
+  <script src="js/secrets.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>
