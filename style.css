@@ -176,9 +176,13 @@ html, body {
   z-index: 1;
   overflow-y: auto;
   padding: 56px max(24px, calc(50vw - 380px)) 80px;
-  background: #141414;
+  /* own vignette (a scroller's background stays put while its content scrolls) */
+  background: radial-gradient(ellipse at center, transparent 50%, var(--vignette)), #141414;
   color: #c8c8c8;
   white-space: pre-wrap;
+  /* Firefox paints a light scrollbar track by default */
+  scrollbar-width: thin;
+  scrollbar-color: #333 #141414;
   animation: rise 1.2s ease both;
 }
 .journal p { margin: 0 0 22px; }
@@ -208,6 +212,13 @@ html, body {
     repeating-linear-gradient(to bottom, var(--scan) 0 1px, transparent 1px 3px),
     radial-gradient(ellipse at center, transparent 50%, var(--vignette));
   animation: flicker 6s infinite;
+}
+
+/* Over the dark journal the light-theme overlay vignette visibly blinked with every CRT flicker
+   (reported on Firefox). The journal has its own vignette, so the overlay keeps only still scanlines. */
+body.journal-open .crt {
+  background: repeating-linear-gradient(to bottom, var(--scan) 0 1px, transparent 1px 3px);
+  animation: none;
 }
 
 @keyframes poweron {

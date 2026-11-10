@@ -705,6 +705,7 @@ async function openJournal() {
   remember({ journal: true });
   const box = $('#journal');
   box.hidden = false;
+  document.body.classList.add('journal-open'); // the journal draws its own vignette, see style.css
   await sleep(1200);
   const cmd = para('cmd');
   await type(cmd, JPROMPT, 0);

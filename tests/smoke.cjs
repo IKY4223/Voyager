@@ -73,6 +73,14 @@ const assert = require('assert');
   await page.waitForSelector('#end:not([hidden])', { timeout: 30000 });
   await page.keyboard.type('1618');
   await page.waitForSelector('#journal:not([hidden])', { timeout: 5000 });
+  // the journal owns its vignette and the overlay stops flickering over it (it used to blink there)
+  const look = await page.evaluate(() => ({
+    overlay: getComputedStyle(document.querySelector('.crt')).animationName,
+    overlayBg: getComputedStyle(document.querySelector('.crt')).backgroundImage,
+    journalBg: getComputedStyle(document.querySelector('#journal')).backgroundImage,
+  }));
+  assert.strictEqual(look.overlay, 'none', 'overlay must not flicker over the journal');
+  assert(!look.overlayBg.includes('radial-gradient') && look.journalBg.includes('radial-gradient'), JSON.stringify(look));
   await page.waitForFunction(() => document.querySelector('#journal').innerText.includes('someone will read the log.'), null, { timeout: 30000 });
   await page.waitForFunction(() => document.querySelector('#term').textContent.includes("third time. I'm starting to recognise you."), null, { timeout: 30000 });
   assert(await page.textContent('#journal').then((t) => t.includes('last entry')));
