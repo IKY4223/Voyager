@@ -4,7 +4,7 @@
 // decide when and how these lines appear.
 //
 // Markup: "{ok:DONE}" colours a fragment with the CSS class `ok` (see parseMarkup in terminal.js).
-// Uses core.js: now, previousVisit, firstVisit, visitNumber, memory, moon, goldenDate, describeDevice.
+// Uses core.js: now, previousVisit, firstVisit, visitNumber, memory, moon, goldenDate.
 
 const SYS_PROMPT = '{dim:<[}{pink:sys@φ-lab}{dim:]>} ';
 const KEEPER_PROMPT = '{dim:<[}{gold:keeper@φ-lab}{dim:]>} ';
@@ -70,8 +70,6 @@ function buildLog() {
     ...when(now.getHours() === 16 && now.getMinutes() === 18, '{pink:16:18.} {dim:you came at the right minute.}'),
     `MOON >> ${phase.name}, ${Math.round(phase.lit * 100)}% lit`,
     `{dim:${moonThought(phase.lit)}}`,
-    `REMOTE_TERMINAL >> ${describeDevice()}`,
-    "{dim:(I can't see your name from here. only your machine. it's enough.)}",
     ...(returning
       ? [
           'WHO >> {pink:1 user online}',

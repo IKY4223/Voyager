@@ -42,7 +42,7 @@ const NOT_FOUND = 'file://' + path.resolve(__dirname, '../404.html');
     await waitForPrompt();
     const log = await text('#term');
     assert(log.includes('Hello, world!'), 'log must greet the world');
-    assert(log.includes('REMOTE_TERMINAL >> '), 'log must describe the visitor machine');
+    assert(!log.includes('REMOTE_TERMINAL'), 'the log must not talk about the visitor machine');
     assert(log.includes('0 users online') && log.includes('retry 1'), 'first visit plays the full log');
     assert(await page.isHidden('#poem'), 'the reveal must wait for input');
     assert.strictEqual(await page.evaluate(() => getComputedStyle(document.body).userSelect), 'none', 'text must not be selectable');

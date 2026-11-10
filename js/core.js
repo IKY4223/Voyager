@@ -76,14 +76,3 @@ function goldenDate(date) {
   const month = date.getMonth() + 1, day = date.getDate();
   return FIB.some((f, i) => i < FIB.length - 1 && f === month && FIB[i + 1] === day);
 }
-
-// What a web page is allowed to know about the visitor's machine. Browsers never expose the
-// computer or account name, so this is the closest thing: system, browser, cores, screen.
-function describeDevice() {
-  const ua = navigator.userAgent;
-  const firstMatch = (table) => (table.find(([pattern]) => pattern.test(ua)) || [])[1];
-  const system = firstMatch([[/Windows/, 'Windows'], [/Android/, 'Android'], [/iPhone|iPad|iPod/, 'iOS'], [/Mac OS X/, 'macOS'], [/Linux/, 'Linux']]);
-  const browser = firstMatch([[/Firefox\//, 'Firefox'], [/Edg\//, 'Edge'], [/OPR\//, 'Opera'], [/Chrome\//, 'Chrome'], [/Safari\//, 'Safari']]);
-  const cores = navigator.hardwareConcurrency;
-  return [system, browser, cores && `${cores} cores`, `${screen.width}×${screen.height}`].filter(Boolean).join(' · ');
-}
