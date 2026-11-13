@@ -16,7 +16,7 @@ python3 -m http.server
 ```
 
 Для публикации подходит GitHub Pages (Settings → Pages → ветка с сайтом, папка `/`).
-Адреса картинки превью в `index.html` и ссылок в `404.html` рассчитаны на `https://iky4223.github.io/Phi/`.
+Адреса картинки превью в `index.html` и ссылок в `404.html` рассчитаны на `https://iky4223.github.io/Voyager/`.
 
 ## Что происходит на сайте
 
