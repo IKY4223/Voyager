@@ -1,10 +1,11 @@
 'use strict';
 
-// Everything after the key press: the monologue over the sky, the switch to the white page,
-// the ending, and what lives on the ending (whispers, the idle check, the postcard).
-// Uses core.js, story.js, terminal.js (term, type) and sky.js (Sky).
+// Everything after the key press: the monologue over the dark sky, the last look back, the burn to
+// the white page, the ending with the pale blue dot, and what lives on the ending (whispers and the
+// idle check). Uses core.js, story.js, terminal.js (term, type) and sky.js (Sky).
 
 const poem = $('#poem');
+const earth = $('#earth');
 
 /* ---------- exact digits of φ ---------- */
 
@@ -28,7 +29,7 @@ function phiDigits(places) {
 
 let whispering = false, whisperId = 0;
 
-// A newer line (a star click, a reply) replaces an older one straight away.
+// A newer line (a click, a reply) replaces an older one straight away.
 async function say(text) {
   const id = ++whisperId, line = $('#whisper');
   whispering = true;
@@ -42,11 +43,10 @@ async function say(text) {
   if (id === whisperId) whispering = false;
 }
 
-let pickedStar = null; // "HD 44749 · 1023 light years", printed on the postcard
-Sky.onStarPicked = (star) => {
-  pickedStar = `${star.name} · ${star.lightYears} light years`;
-  say(`${pickedStar}. ${pick(STAR_NOTES)}`);
-};
+Sky.onSparkPicked = (which) => say(sparkLine(which));
+
+let earthClicks = 0;
+earth.addEventListener('click', () => say(EARTH_LINES[earthClicks++ % EARTH_LINES.length]));
 
 // After the story the machine keeps thinking out loud now and then, and notices shooting stars.
 async function whispers() {
@@ -87,51 +87,6 @@ function watchIdle() {
   }, 1000);
 }
 
-/* ---------- postcard: a keepsake of this visit, downloaded as a PNG ---------- */
-
-function postcard() {
-  const WIDTH = 1200, HEIGHT = 630;
-  const INK = { paper: '#141414', title: '#f2ede4', text: '#c8c8c8', star: '#e8c170', small: '#888888', phi: '#ff4fa3' };
-  const card = document.createElement('canvas');
-  card.width = WIDTH;
-  card.height = HEIGHT;
-  const ctx = card.getContext('2d');
-  ctx.fillStyle = INK.paper;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-  // the live sky behind the text, cropped to the card's shape
-  const sky = Sky.canvas;
-  const scale = Math.min(sky.width / WIDTH, sky.height / HEIGHT);
-  if (scale) ctx.drawImage(sky, (sky.width - WIDTH * scale) / 2, (sky.height - HEIGHT * scale) / 2, WIDTH * scale, HEIGHT * scale, 0, 0, WIDTH, HEIGHT);
-
-  ctx.textAlign = 'center';
-  ctx.shadowColor = INK.paper;
-  ctx.shadowBlur = 18;
-  ctx.fillStyle = INK.phi;
-  ctx.font = '120px Georgia, serif';
-  ctx.fillText('φ', WIDTH / 2, 220);
-  const phase = moon(now);
-  const lines = [
-    [INK.title, 'φ-lab observatory · postcard'],
-    [INK.text, `${isoDate(now)} ${clockTime(now)} · ${phase.name}, ${Math.round(phase.lit * 100)}% lit`],
-    [INK.star, pickedStar ? `your star: ${pickedStar}` : "you didn't pick a star. next time."],
-    [INK.small, `visit #${visitNumber}`],
-  ];
-  ctx.font = '22px "Courier New", monospace';
-  lines.forEach(([color, text], i) => {
-    ctx.fillStyle = color;
-    ctx.fillText(text, WIDTH / 2, 320 + i * 46);
-  });
-
-  card.toBlob((blob) => {
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `phi-lab-postcard-${isoDate(now)}.png`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-  });
-  say(POSTCARD_LINE);
-}
-
 /* ---------- the reveal ---------- */
 
 // Fades a line in letter by letter.
@@ -165,6 +120,13 @@ async function countForever(el) {
   }
 }
 
+// Clears the poem area and fades it out before the next scene.
+async function fadePoem() {
+  poem.classList.add('out');
+  await sleep(1600);
+  poem.querySelector('.lines').replaceChildren();
+}
+
 async function reveal() {
   term.classList.add('fade');
   await sleep(1000);
@@ -178,15 +140,26 @@ async function reveal() {
   poem.hidden = false;
   for (const line of VERSE) await showLine(lines, line);
   await sleep(3000);
-  poem.classList.add('out');
-  await sleep(1600);
+  await fadePoem();
 
-  // the white page
+  // the last look back, then the camera turns toward the Sun and the screen burns white
+  poem.classList.replace('out', 'look-back');
+  for (const line of LOOK_BACK) {
+    await showLine(lines, line, 55);
+    await sleep(1200);
+  }
+  await sleep(1800);
+  document.body.classList.add('flash'); // see .flash in style.css
+  await sleep(500);
   document.body.classList.add('light');
   $('meta[name=theme-color]').content = getComputedStyle(document.body).getPropertyValue('--bg').trim();
   lines.replaceChildren();
-  poem.classList.replace('out', 'dream');
-  await sleep(1400);
+  poem.classList.remove('look-back');
+  await sleep(1800);
+  document.body.classList.remove('flash');
+
+  // the white page
+  poem.classList.add('dream');
   for (const line of DREAM_LINES) {
     await showLine(lines, line, 80);
     await sleep(900);
@@ -196,7 +169,10 @@ async function reveal() {
   await sleep(1600);
   poem.hidden = true;
 
-  // the ending
+  // the ending: sunlight bands, one pale blue dot, and φ in the middle
+  Sky.mode = 'beams';
+  if (reduceMotion) Sky.redraw();
+  earth.hidden = false;
   const end = $('#end');
   end.hidden = false;
   await sleep(1800);

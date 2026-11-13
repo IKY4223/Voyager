@@ -1,8 +1,8 @@
 'use strict';
 
-// What a visitor can type on the white page: words the machine answers, `postcard`,
-// `1618` (the keeper's journal) and, once the journal has been read, `mail` (the machine's unsent letters).
-// Uses core.js, story.js, terminal.js (type, scrollToEnd), sky.js (Sky) and ending.js (say, postcard).
+// What a visitor can type on the white page: words the machine answers, `1618` (the keeper's journal)
+// and, once the journal has been read, `mail` (the machine's unsent letters).
+// Uses core.js, story.js, terminal.js (type, scrollToEnd), sky.js (Sky) and ending.js (say).
 
 const journal = $('#journal');
 const JOURNAL_PROMPT = KEEPER_PROMPT + '$ ';
@@ -109,7 +109,6 @@ addEventListener('keydown', (event) => {
     return;
   }
   if (typedText.endsWith(String(DAYS_ALONE))) return matched(openJournal);
-  if (typed('postcard')) return matched(postcard);
   const reply = REPLIES.find(([word]) => typed(word));
   if (reply) matched(() => say(reply[1]));
 });

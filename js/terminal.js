@@ -124,7 +124,7 @@ function waitAnyInput(onInput) {
   });
 }
 
-// "RENDER golden_hour? (Y/y)": waits for any input, teasing the visitor while it waits.
+// "RENDER …? (Y/y)": waits for any input, with a few quiet lines while it waits.
 async function askToRender(onInput) {
   const input = waitAnyInput(onInput);
   const question = newLine();

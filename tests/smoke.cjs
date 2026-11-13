@@ -6,7 +6,6 @@
 
 const { chromium } = require('playwright');
 const path = require('path');
-const fs = require('fs');
 const assert = require('assert');
 
 const SITE = 'file://' + path.resolve(__dirname, '../index.html');
@@ -22,7 +21,7 @@ const NOT_FOUND = 'file://' + path.resolve(__dirname, '../404.html');
   const text = (selector) => page.textContent(selector);
   const waitForText = (selector, wanted, timeout = 30000) =>
     page.waitForFunction(([s, w]) => document.querySelector(s).textContent.includes(w), [selector, wanted], { timeout });
-  const waitForPrompt = () => waitForText('#term', 'RENDER golden_hour?');
+  const waitForPrompt = () => waitForText('#term', 'RENDER pale_blue_dot?');
   const playToEnding = async () => {
     await waitForPrompt();
     await page.keyboard.press('y');
@@ -43,32 +42,46 @@ const NOT_FOUND = 'file://' + path.resolve(__dirname, '../404.html');
     const log = await text('#term');
     assert(log.includes('Hello, world!'), 'log must greet the world');
     assert(!log.includes('REMOTE_TERMINAL'), 'the log must not talk about the visitor machine');
-    assert(log.includes('0 users online') && log.includes('retry 1'), 'first visit plays the full log');
+    assert(log.includes('0 users online') && log.includes('Password:') && log.includes('ITERATE'), 'first visit plays the full log');
+    assert(/VOYAGER_1 >> \d+\.\d AU · \d+\.\d billion km/.test(log) && log.includes('VOYAGER_2 >>'), 'log must track both Voyagers');
+    assert(log.includes('light-day') || log.includes('a whole day to reach us'), 'log must mention the light-day');
+    assert(log.includes('AC+79 3888') && log.includes('close to φ. not φ.'));
+    for (const gone of ['lens_cap', 'MOON >>', 'golden date', '^_^', 'Your turn~', 'M51']) assert(!log.includes(gone), 'removed from the log: ' + gone);
     assert(await page.isHidden('#poem'), 'the reveal must wait for input');
     assert.strictEqual(await page.evaluate(() => getComputedStyle(document.body).userSelect), 'none', 'text must not be selectable');
     assert.strictEqual(await page.$('#loader'), null, 'loader must be gone once scripts run');
   });
 
-  await step('real-world maths', async () => {
-    // full moon 2024-04-23 23:49 UTC, new moon (eclipse) 2024-04-08 18:21 UTC
-    const full = await page.evaluate(() => moon(new Date('2024-04-23T23:49:00Z')));
-    const dark = await page.evaluate(() => moon(new Date('2024-04-08T18:21:00Z')));
-    assert(full.name === 'full moon' && full.lit > 0.97, JSON.stringify(full));
-    assert(dark.name === 'new moon' && dark.lit < 0.03, JSON.stringify(dark));
-    // golden dates: month/day are neighbouring Fibonacci numbers
-    const golden = await page.evaluate(() => [[0, 1], [0, 2], [1, 3], [2, 5], [4, 8], [7, 13], [4, 9], [6, 21]].map(([m, d]) => goldenDate(new Date(2026, m, d))));
-    assert.deepStrictEqual(golden, [true, true, true, true, true, true, false, false]);
+  await step('real-world numbers', async () => {
+    // NASA: Voyager 1 is 25.902 billion km from Earth (one light-day) on 2026-11-18 10:16:07 UTC
+    const atLightDay = await page.evaluate(() => voyager1Km(Date.UTC(2026, 10, 18, 10, 16, 7)));
+    assert(Math.abs(atLightDay - 25.902e9) < 1e6, String(atLightDay));
+    // a year later it is 17 km/s × one year further: about 536 million km
+    const yearLater = await page.evaluate(() => voyager1Km(Date.UTC(2027, 10, 18, 10, 16, 7)) - voyager1Km(Date.UTC(2026, 10, 18, 10, 16, 7)));
+    assert(Math.abs(yearLater - 17 * 365 * 86400) < 1, String(yearLater));
+  });
+
+  await step('browser console commands', async () => {
+    const said = [];
+    const listen = (m) => said.push(m.text());
+    page.on('console', listen);
+    await page.evaluate(() => { void help; void voyager; void phi; });
+    page.off('console', listen);
+    const out = said.join('\n');
+    assert(out.includes('commands: ls') && out.includes('voyager 1 ·') && out.includes('1.6180339887498948482'), out);
   });
 
   await step('visit 1: reveal and ending', async () => {
     await page.keyboard.press('y');
     await page.waitForSelector('#poem:not([hidden])', { timeout: 15000 });
+    await waitForText('#poem', '14 february 1990');
     await page.waitForSelector('#poem.dream .line', { timeout: 30000 });
     assert(await page.isHidden('#poem .label'), 'the label must not show on the white page (it used to jump left)');
     await page.waitForSelector('#end:not([hidden])', { timeout: 30000 });
     assert(await page.evaluate(() => document.body.classList.contains('light')), 'ending must be in the light theme');
     await waitForText('#end .output', '1.618033988749895', 10000);
     assert.strictEqual(await page.$('#end h1'), null, 'no big φ on the white page');
+    assert(await page.isVisible('#earth'), 'the pale blue dot must be on the ending');
     // the endless digits are exact (BigInt), not float noise
     await page.waitForFunction(() => document.querySelector('.digits').textContent.length > 24, null, { timeout: 10000 });
     const digits = await text('.digits');
@@ -76,16 +89,15 @@ const NOT_FOUND = 'file://' + path.resolve(__dirname, '../404.html');
     assert(PHI.startsWith(digits) || digits.startsWith(PHI), digits);
   });
 
-  await step('ending: whispers, talking, postcard, idle check', async () => {
+  await step('ending: whispers, the dot, talking, idle check', async () => {
     await waitForText('#whisper', 'you can type to me', 10000); // the hint always comes first
     await page.keyboard.type('hello');
     await waitForText('#whisper', "it's been a while", 5000);
     await page.keyboard.type(' phi'); // must not trigger "hi"
     await waitForText('#whisper', "I won't stop myself", 5000);
 
-    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }), page.keyboard.type(' postcard')]);
-    assert(/^phi-lab-postcard-\d{4}-\d{2}-\d{2}\.png$/.test(download.suggestedFilename()), download.suggestedFilename());
-    assert((await fs.promises.stat(await download.path())).size > 10000, 'postcard png too small');
+    await page.click('#earth');
+    await waitForText('#whisper', "that's everyone", 5000);
 
     // two (scaled) minutes of silence: the machine asks, then notices you again
     await waitForText('#whisper', 'are you still there?', 20000);
@@ -99,7 +111,7 @@ const NOT_FOUND = 'file://' + path.resolve(__dirname, '../404.html');
     await page.goto(SITE);
     await page.waitForTimeout(1500);
     assert.strictEqual(await page.evaluate(() => skip()), 'ok. skipping the boring part.');
-    await waitForText('#term', 'RENDER golden_hour?', 5000);
+    await waitForText('#term', 'RENDER pale_blue_dot?', 5000);
   });
 
   await step('visit 3: journal and outbox', async () => {
@@ -135,10 +147,11 @@ const NOT_FOUND = 'file://' + path.resolve(__dirname, '../404.html');
 
   await step('visit 4: the machine remembers', async () => {
     await page.goto(SITE + '?fast');
-    await waitForText('#term', 'lens cap is off this time');
+    await waitForPrompt();
     const log = await text('#term');
     assert(log.includes('you came back.') && log.includes('1 user online') && log.includes('you read the journal last time'));
-    assert(!log.includes('retry 1'), 'return visits skip the calibration');
+    assert(log.includes('session restored') && log.includes('cached from your last visit'), 'return visits get the short log');
+    assert(!log.includes('Password:'), 'return visits skip the login');
     assert.deepStrictEqual(errors, []);
   });
 

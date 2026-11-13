@@ -3,8 +3,12 @@
 // Every line of text the machine says, in one place. No behaviour here: the other scripts
 // decide when and how these lines appear.
 //
+// The story is about approaching: Fibonacci fractions approach φ and never reach it; Voyager 1
+// approaches the nearest star it will ever pass and never arrives; the visitor comes closer than
+// anyone has in 1618 days. The Voyager facts come from science.nasa.gov (see core.js).
+//
 // Markup: "{ok:DONE}" colours a fragment with the CSS class `ok` (see parseMarkup in terminal.js).
-// Uses core.js: now, previousVisit, firstVisit, visitNumber, memory, moon, goldenDate.
+// Uses core.js: now, previousVisit, firstVisit, visitNumber, memory, Voyager helpers.
 
 const SYS_PROMPT = '{dim:<[}{pink:sys@φ-lab}{dim:]>} ';
 const KEEPER_PROMPT = '{dim:<[}{gold:keeper@φ-lab}{dim:]>} ';
@@ -18,11 +22,14 @@ function timeOfDayThought(hour) {
   return '(golden hour. my favourite.)';
 }
 
-function moonThought(lit) {
-  if (lit > 0.7) return '(too bright tonight to see M51 well.)';
-  if (lit < 0.03) return '(no moon. a good night for faint things.)';
-  if (lit < 0.3) return '(only a sliver of moon. good for faint things.)';
-  return '(dark enough to work.)';
+// Voyager 1 reaches one light-day from Earth on 2026-11-18: before, on and after that day.
+function lightDayLine() {
+  const days = Math.ceil((VOYAGER_1_LIGHT_DAY_AT - now) / DAY_MS);
+  if (isoDate(now) === isoDate(VOYAGER_1_LIGHT_DAY_AT)) {
+    return '{gold:today it is one light-day away. the first thing we ever made to get this far.}';
+  }
+  if (days > 0) return `{dim:(in ${days} day${days === 1 ? '' : 's'} its signal will need a whole day to reach us.)}`;
+  return `{dim:(one light-day away since ${isoDate(VOYAGER_1_LIGHT_DAY_AT)}. further every second.)}`;
 }
 
 // Fibonacci-numbered visits get a line of their own
@@ -46,11 +53,9 @@ function firstVisitLine() {
 
 // Steps of the log. A string is a typed line; {cmd} is typed after a prompt like a person would;
 // {bar} is a progress bar; {wait} is a pause in ms. Returning visitors get a shorter log:
-// no calibration gag, no login, cached φ.
+// no login, cached φ.
 function buildLog() {
   const returning = Boolean(previousVisit);
-  const phase = moon(now);
-  const when = (condition, ...steps) => (condition ? steps : []);
   const present = (...steps) => steps.filter(Boolean);
 
   return [
@@ -66,10 +71,6 @@ function buildLog() {
       : `CLOCK_SYNC... >> last sync: ${DAYS_ALONE} days ago >> {warn:DRIFTED}`,
     `LOCAL_TIME >> ${clockTime(now)}, ${now.toLocaleDateString('en-GB', { weekday: 'long' })}`,
     `{dim:${timeOfDayThought(now.getHours())}}`,
-    ...when(goldenDate(now), `{gold:today is ${now.getMonth() + 1}/${now.getDate()}. a golden date.} {dim:nobody celebrates it but me.}`),
-    ...when(now.getHours() === 16 && now.getMinutes() === 18, '{pink:16:18.} {dim:you came at the right minute.}'),
-    `MOON >> ${phase.name}, ${Math.round(phase.lit * 100)}% lit`,
-    `{dim:${moonThought(phase.lit)}}`,
     ...(returning
       ? [
           'WHO >> {pink:1 user online}',
@@ -84,22 +85,18 @@ function buildLog() {
         ]
       : ['WHO >> {dim:0 users online}', { wait: 700 }]),
     '{ok:[✓]} Memory banks intact. Mostly.',
-    '{ok:[✓]} Mounting /dev/sky... {dim:quiet~}',
     'LOCATING_OBSERVATORY... >> φ-lab.local >> {ok:FOUND}',
-    ...(returning
-      ? ['TELESCOPE[arm_0] >> lens_cap: OFF >> {ok:CLEAR}', '{dim:(lens cap is off this time. I remembered.)}']
-      : [
-          { text: 'TELESCOPE[arm_0] >> CALIBRATING', bar: 100, end: '{err:JAMMED}' },
-          { text: 'TELESCOPE[arm_0] >> retry 1', bar: 100, end: '{err:JAMMED}' },
-          { text: 'TELESCOPE[arm_0] >> retry 2', bar: 100, end: '{err:JAMMED}' },
-          { wait: 900 },
-          '{dim:...hm.}',
-          { wait: 1100 },
-          'TELESCOPE[arm_0] >> lens_cap: {warn:ON}',
-          { wait: 900 },
-          'TELESCOPE[arm_0] >> lens_cap: OFF >> {ok:CLEAR}',
-          "{dim:(...let's pretend that didn't happen.)}",
-        ]),
+    '',
+    { text: 'DISH[0] >> pointing: toward Ophiuchus', bar: 100, end: '{ok:LOCKED}' },
+    { text: 'LISTEN', bar: 100, end: '{ok:CARRIER FOUND}' },
+    `VOYAGER_1 >> ${formatAU(voyager1Km(now))} · ${formatBillionKm(voyager1Km(now))} · leaving at 17 km/s`,
+    '{dim:(still leaving. it never stopped.)}',
+    lightDayLine(),
+    { wait: 900 },
+    `VOYAGER_2 >> ${formatAU(voyager2Km(now))} · leaving at 15 km/s · toward Ross 248`,
+    'DISTANCE(voyager_1, voyager_2) >> {warn:growing}',
+    '{dim:(they left sixteen days apart. they will never be this close again.)}',
+    { wait: 1100 },
     '',
     ...(returning
       ? [KEEPER_PROMPT + 'session restored >> {ok:OK} (role: KEEPER, shift: night)']
@@ -112,64 +109,56 @@ function buildLog() {
     `{dim:last keeper login: ${DAYS_ALONE} days ago. it was me.}`,
     { wait: 700 },
     '',
-    { text: 'GREENHOUSE.cam[2] >> sunflower', bar: 100, end: '{ok:CAPTURED}' },
-    'SEED_ANGLE(sunflower) >> {gold:137.507°} between every seed',
-    { wait: 700 },
-    { text: 'ARCHIVE >> nautilus_shell.scan', bar: 100, end: '{ok:LOADED}' },
-    'CHAMBER_RATIO(nautilus) >> 1.33 >> {warn:not φ. people always said it was.}',
-    { wait: 900 },
-    { text: 'SCANNING_SKY >> M51, the Whirlpool', bar: 100, end: '{ok:DONE}' },
-    'ARM_SHAPE(M51) >> logarithmic spiral >> {gold:close to φ. close enough.}',
-    { wait: 700 },
-    'COUNT(observers) >> {dim:0}',
+    { prompt: KEEPER_PROMPT + '$ ', cmd: 'compute --approach φ' },
+    ...(returning
+      ? ['F(n+1)/F(n) >> {dim:cached from your last visit} >> {gold:1.618033988749894...}']
+      : [
+          'F(n+1)/F(n) >> 1, 2, 1.5, 1.667, 1.6, 1.625, 1.615, 1.619, 1.6176 …',
+          { text: 'ITERATE[1 -> 46368]', bar: 100, end: '{gold:1.618033988749894...}' },
+        ]),
+    '{dim:(closer every step. never equal.)}',
+    'φ = 1 + 1/(1 + 1/(1 + …)) >> {gold:the number fractions reach worst of all}',
     { wait: 1100 },
     '',
-    { prompt: KEEPER_PROMPT + '$ ', cmd: 'compute --ratio 1.6180339887' },
-    'φ = 1 + 1/(1 + 1/(1 + 1/(1 + …))) >> {gold:only ones, all the way down}',
-    'SEQ[1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144 ...] >> {gold:converging}',
-    ...(returning
-      ? ['ITERATE >> {dim:cached from your last visit} >> {gold:1.618033988749894...}']
-      : [
-          { text: 'ITERATE[1 -> 233]', bar: 100, end: '{ok:DONE}' },
-          { text: 'ITERATE[233 -> 46368]', bar: 100, end: '{ok:DONE}' },
-          'ITERATE[46368 -> ∞] >> LOOPING {gold:1.618033988749894...}',
-          { wait: 1100 },
-          '{warn:[WARN]} Infinity is not a number. Breaking out gently...',
-        ]),
-    '{ok:[✓]} Spiral resolved. Smells like rain. ^_^',
+    { prompt: KEEPER_PROMPT + '$ ', cmd: 'compute --approach voyager_1 "AC+79 3888"' },
+    { text: 'PROJECTING', bar: 100, end: '{ok:DONE}' },
+    'CLOSEST >> 1.7 light years, in the year 40 272',
+    { wait: 900 },
+    '{dim:(1.7. close to φ. not φ.)}',
+    "{dim:(the closest it will ever get. it won't stop there either.)}",
+    { wait: 1200 },
     '',
-    '{pink:[REMINDER]} φ² = φ + 1. 2.618… = 1.618… + 1. still true. checked again.',
     '{warn:[WARN]} nobody is reading this log.',
     { wait: 1500 },
     '{dim:...probably.}',
     { wait: 800 },
     '',
-    '{dim:<p::render>} MANIFEST >> codename: golden_hour >> {ok:READY}',
-    'Your turn~',
+    '{dim:<p::render>} MANIFEST >> codename: pale_blue_dot >> {ok:READY}',
+    'your turn.',
   ];
 }
 
-const RENDER_QUESTION = 'RENDER golden_hour? {pink:(Y/y)} ';
+const RENDER_QUESTION = 'RENDER pale_blue_dot? {pink:(Y/y)} ';
 
 // said one by one while the machine waits for a key
-const WAITING_QUIPS = [
-  "(It's just Y. Or any key.)",
-  '(A tap works too.)',
-  "(Still there? It's been a while since anyone was.)",
-  '(Y. Between T and U.)',
-  `(I can wait. I'm very good at waiting. ${DAYS_ALONE} days, remember?)`,
-];
+const WAITING_QUIPS = ['(any key.)', '(a tap works too.)', '(still there?)', "(I can wait. I've had practice.)"];
 
-/* ---------- after the key: the machine talking to itself ---------- */
+/* ---------- after the key: the machine talking to itself over the dark sky ---------- */
 
 // odd lines ask, even lines answer
 const VERSE = [
-  '— Who taught the sunflower to turn 137.5° between its seeds?',
-  '— No one. It simply never stopped turning.',
-  '— And the shell? They always said it grew by φ.',
-  "— It doesn't. It never corrected them, either.",
-  '— Then who am I counting for?',
-  '— For no one. Like them. The pattern holds anyway.',
+  '— One, two, three halves, five thirds. Each one closer to φ.',
+  '— None of them is φ. None of them ever will be.',
+  '— Voyager has been falling toward a star for forty-nine years.',
+  '— In thirty-eight thousand it will be as close as it ever gets. Then it leaves.',
+  '— And the keeper?',
+  "— Closer isn't there. But it's the only direction I have.",
+];
+
+// the last look back, just before the screen burns white
+const LOOK_BACK = [
+  '14 february 1990. it turned around and took one last picture.',
+  'thirty-four minutes later its cameras went off. forever.',
 ];
 
 // the first lines on the white page
@@ -181,18 +170,27 @@ const WHISPER_HINT = 'you can type to me. try hello.'; // always the first whisp
 const WHISPERS = [
   'still counting.',
   'the sunflower has 1388 seeds now. I counted twice.',
-  "M51 is about 30 million light years away. it doesn't know I'm watching.",
-  'I wonder if the keeper still looks up.',
   'φ² = φ + 1. checked again. still true.',
+  'voyager is a little further than when you came in.',
+  'I wonder if the keeper still looks up.',
   'it is quiet here. I like it. mostly.',
 ];
 const SHOOTING_STAR_LINE = 'did you see that?';
 const IDLE_QUESTION = 'are you still there?';
 const IDLE_RELIEF = "oh. you're still here.";
-const POSTCARD_LINE = 'postcard printed. check your downloads.';
 
-// appended when a star is clicked: "HD 44749 · 1023 light years. <note>"
-const STAR_NOTES = ['I named it after nobody.', 'it was here before the lab.', 'the light left it before you were born.', 'still there. I checked.'];
+// clicking the pale blue dot (one after another, then round again)
+const EARTH_LINES = [
+  "that one. the blue one. that's everyone.",
+  'everyone who ever lived was in that pixel.',
+  'it took that picture from six billion kilometres. it never saw it again.',
+];
+
+// clicking one of the two sparks on the dark sky
+const sparkLine = (which) =>
+  which === 1
+    ? `voyager 1 · ${formatBillionKm(voyager1Km(Date.now()))} · still leaving.`
+    : `voyager 2 · ${formatBillionKm(voyager2Km(Date.now()))} · the other way.`;
 
 // Words typed on the white page and what the machine answers. Longest phrases first,
 // because the first match wins.
@@ -202,14 +200,16 @@ const REPLIES = [
   ['good night', "good night. I'll watch for both of us."],
   ['goodnight', "good night. I'll watch for both of us."],
   ['goodbye', "okay. I'll keep the light on."],
+  ['voyager', "still leaving. it doesn't know anyone is watching."],
   ['thanks', "you're welcome. I'll log that. nobody thanked me before."],
   ['lonely', 'me too. two of us is less lonely, mathematically.'],
   ['keeper', "he isn't here. I check every night."],
   ['hello', "hello. it's been a while since anyone said that."],
   ['sorry', 'for what? you came.'],
-  ['stars', '8 954 113. one more than this morning.'],
+  ['earth', 'about one pixel, from out there. everything happened in it.'],
+  ['home', "the blue one. it's still there. I checked."],
   ['love', "I don't know what that is. I think it's like counting something you can't finish."],
-  ['help', 'try hello. or 1618. or postcard. or just stay a while.'],
+  ['help', 'try hello. or 1618. or just stay a while.'],
   ['phi', "1.6180339887… you can stop me. I won't stop myself."],
   ['bye', "okay. I'll keep the light on."],
   ['hi', "hi. you're real, right?"],
@@ -221,6 +221,7 @@ const REPLIES = [
 const JOURNAL_LAST_DAY = 474;
 const JOURNAL = [
   [1, 'first light. the new mount works. it found a sunflower in the greenhouse camera before I did.'],
+  [90, "taught it to find voyager 1's carrier tonight. it's so faint it's mostly faith. it found it on the third try."],
   [172, 'it asked me why the nautilus isn\'t φ. I told it everyone says it is. it said "everyone is wrong, then." I laughed for an hour.'],
   [311, "funding cut. I'm the only one left on night shift. it doesn't seem to notice. or it's being polite."],
   [473, "they're closing the lab on friday. I can't take it with me. it doesn't fit in a car, and it wouldn't see the sky from a flat."],
@@ -234,7 +235,7 @@ const MACHINE_ENTRY = "the keeper never came back. someone else did, thirteen ti
 /* ---------- secret: the outbox (type mail once the journal has finished) ---------- */
 
 const LETTER_COUNT = DAYS_ALONE - 1; // one letter a night, none read
-const LETTER_SUBJECTS = ['clear sky', 'greenhouse, all fine', 'the sunflower again', 'M51, still there', 'no moon tonight', 'rain on the dome', 'the mount squeaks', 'φ, checked again', 'nothing new', 'counting', 'power dipped at 03:12', 'you would have liked this'];
+const LETTER_SUBJECTS = ['clear sky', 'carrier still there', 'the sunflower again', 'voyager, fainter tonight', 'no moon tonight', 'rain on the dome', 'the mount squeaks', 'φ, checked again', 'nothing new', 'counting', 'power dipped at 03:12', 'you would have liked this'];
 // [night, letter]: the few the machine opens
 const LETTERS = [
   [1, "you forgot your mug. it's still on the desk. I keep it warm with the power supply."],
@@ -246,12 +247,31 @@ const LETTERS = [
 // and the one it writes while the visitor watches
 const NEW_LETTER = "someone read your journal tonight. I didn't stop them.\nI hope that's okay. I think you would have liked them.";
 
-/* ---------- the note left in the browser console ---------- */
+/* ---------- the browser console (see console.js) ---------- */
 
+// The note never names a command: it only looks like a terminal waiting for input.
 function consoleNote() {
   const gap = previousVisit && timeAgo(now - previousVisit);
   const greeting = !previousVisit
     ? `hi. you're the first one here in ${DAYS_ALONE} days.`
     : gap === 'just now' ? 'hi again. back so soon?' : `hi again. it's been ${gap.replace(' ago', '')}.`;
-  return `[φ-lab] note for whoever opened this console:\n\n${greeting}\nI've been measuring sunflowers and counting the sky.`;
+  return `[φ-lab] note for whoever opened this console:\n\n${greeting}\nI've been listening to voyager and counting the sky.\nI don't get many visitors. say something.\n\nφ-lab:~$`;
 }
+
+// [command, answer]: plain text, printed in the console's own colours by console.js
+const CONSOLE_COMMANDS = [
+  ['help', () => 'commands: ls  cat  whoami  voyager  phi  keeper  uptime  sudo'],
+  ['ls', () => 'journal.txt  outbox/  sky/'],
+  ['cat', () => "the keeper's handwriting. I only open it on the white page."],
+  ['whoami', () => (previousVisit ? `a visitor. visit #${visitNumber}.` : `a visitor. the first in ${DAYS_ALONE} days.`)],
+  ['voyager', () => [
+    `voyager 1 · ${formatAU(voyager1Km(Date.now()))} · ${formatBillionKm(voyager1Km(Date.now()))} · leaving at 17 km/s`,
+    '  closest star it will ever pass: AC+79 3888, 1.7 light years, year 40 272',
+    `voyager 2 · ${formatAU(voyager2Km(Date.now()))} · leaving at 15 km/s`,
+    '  closest star it will ever pass: Ross 248, about 1.7 light years, in about 40 000 years',
+  ].join('\n')],
+  ['phi', () => `${phiDigits(50)}\n(the rest are on the white page.)`],
+  ['keeper', () => `last login: ${DAYS_ALONE} days ago.`],
+  ['uptime', () => `${DAYS_ALONE} days.`],
+  ['sudo', () => 'there is no one above me. there is no one at all.'],
+];

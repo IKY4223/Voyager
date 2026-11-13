@@ -1,7 +1,7 @@
 'use strict';
 
 // Shared toolkit, loaded first: DOM helper, timing, what the browser remembers about the visitor,
-// and the real-world facts the story uses (clock, moon, golden dates, the visitor's machine).
+// and the real-world facts the story uses (the clock, the two Voyagers).
 // The scripts are plain <script> files (no modules), so the site also runs straight from disk.
 
 const $ = (selector) => document.querySelector(selector);
@@ -61,18 +61,22 @@ function timeAgo(ms) {
   return hours < 24 ? unit(hours, 'hour') : unit(days, 'day');
 }
 
-// Moon phase from the date alone: days since a known new moon (2000-01-06 18:14 UTC), modulo the synodic month.
-function moon(date) {
-  const SYNODIC_DAYS = 29.530588853;
-  const NAMES = ['new moon', 'waxing crescent', 'first quarter', 'waxing gibbous', 'full moon', 'waning gibbous', 'last quarter', 'waning crescent'];
-  const age = ((((date - Date.UTC(2000, 0, 6, 18, 14)) / DAY_MS) % SYNODIC_DAYS) + SYNODIC_DAYS) % SYNODIC_DAYS;
-  const lit = (1 - Math.cos((2 * Math.PI * age) / SYNODIC_DAYS)) / 2;
-  return { name: NAMES[Math.round((age / SYNODIC_DAYS) * 8) % 8], lit };
-}
+/* ---------- the Voyagers (source: science.nasa.gov/mission/voyager, read 2026-11-12) ---------- */
 
-// A "golden date": month and day are neighbouring Fibonacci numbers (1/1, 1/2, 2/3, 3/5, 5/8, 8/13).
-function goldenDate(date) {
-  const FIB = [1, 1, 2, 3, 5, 8, 13];
-  const month = date.getMonth() + 1, day = date.getDate();
-  return FIB.some((f, i) => i < FIB.length - 1 && f === month && FIB[i + 1] === day);
-}
+const KM_PER_AU = 149597870.7;
+const KM_PER_LIGHT_DAY = 299792.458 * 86400; // 25 902 068 371 km
+
+// Voyager 1 is one light-day from Earth at this instant (NASA forecast: 25.902 billion km, Nov 18, 2026 2:16:07 a.m. PST).
+const VOYAGER_1_LIGHT_DAY_AT = Date.UTC(2026, 10, 18, 10, 16, 7);
+const VOYAGER_1_KM_PER_S = 17.0; // relative to the Sun
+// Voyager 2: 116.167 AU from Earth on Nov 5, 2017, leaving at 15.4 km/s (the newest values NASA's pages give).
+const VOYAGER_2_ANCHOR = { at: Date.UTC(2017, 10, 5), km: 116.167 * KM_PER_AU };
+const VOYAGER_2_KM_PER_S = 15.4;
+
+// shortcut: straight-line extrapolation from one published point; Earth's own orbit makes the true
+// Earth distance swing by about ±1 AU (under 1%). Fine for a story; use JPL Horizons if it ever needs to be exact.
+const voyager1Km = (time) => KM_PER_LIGHT_DAY + VOYAGER_1_KM_PER_S * ((time - VOYAGER_1_LIGHT_DAY_AT) / 1000);
+const voyager2Km = (time) => VOYAGER_2_ANCHOR.km + VOYAGER_2_KM_PER_S * ((time - VOYAGER_2_ANCHOR.at) / 1000);
+
+const formatAU = (km) => (km / KM_PER_AU).toFixed(1) + ' AU';
+const formatBillionKm = (km) => (km / 1e9).toFixed(1) + ' billion km';

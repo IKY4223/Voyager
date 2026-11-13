@@ -10,6 +10,7 @@
   --pink: #ff4fa3;
   --gold: #e8c170;
   --poem: #f2ede4;
+  --earth: #6fa8ff; /* the only blue on the site */
   --scan: rgba(0, 0, 0, .22);
   --vignette: rgba(0, 0, 0, .6);
 }
@@ -106,7 +107,23 @@ html, body {
 /* the first lines on the white page */
 .poem.dream { text-align: left; font-size: clamp(18px, 2.4vw, 26px); }
 /* without this the label showed up alone and centred, then jumped left when the first line arrived */
-.poem.dream .label { display: none; }
+.poem.dream .label,
+.poem.look-back .label { display: none; }
+
+/* the last look back: two quiet lines in the dark before the screen burns white */
+.poem.look-back { color: var(--fg); font-size: clamp(14px, 1.6vw, 17px); text-shadow: none; }
+.poem.look-back .line:nth-child(odd) { opacity: 1; }
+
+/* the burn to white, as a camera turned toward the Sun */
+body.flash::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  background: #fff;
+  pointer-events: none;
+  animation: burn 2.3s ease forwards;
+}
 
 /* letters fade in one by one (showLine in ending.js) */
 .word { white-space: nowrap; }
@@ -152,6 +169,36 @@ html, body {
   color: var(--dim);
   word-break: break-all;
 }
+
+.earth {
+  position: fixed;
+  left: 71.4%; /* inside the brightest sunlight band drawn by sky.js (beams mode) */
+  top: 63.2%;
+  z-index: 1;
+  width: 28px; /* a forgiving click area around a dot of a few pixels */
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: default;
+  animation: rise 2.4s ease both;
+}
+.earth::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 5px; height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--earth);
+  box-shadow:
+    0 0 6px 2px color-mix(in srgb, var(--earth) 90%, transparent),
+    0 0 18px 6px color-mix(in srgb, var(--earth) 45%, transparent);
+  animation: pulse 4s ease-in-out infinite;
+}
+.earth:focus-visible { outline: 1px solid var(--earth); outline-offset: 2px; }
 
 .foot {
   position: fixed;
@@ -233,6 +280,8 @@ body.journal-open .crt {
   100% { transform: none; filter: none; opacity: 1; }
 }
 @keyframes blink { 50% { opacity: 0; } }
+@keyframes burn { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes pulse { 50% { opacity: .65; } }
 @keyframes in { to { opacity: 1; filter: blur(0); } }
 @keyframes rise { from { opacity: 0; transform: translateY(12px); filter: blur(6px); } }
 @keyframes flicker { 0%, 96%, 100% { opacity: 1; } 97% { opacity: .85; } 98% { opacity: 1; } 99% { opacity: .9; } }
